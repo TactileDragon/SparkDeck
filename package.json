@@ -4,7 +4,8 @@
   "description": "SparkDeck - Static Flashcards app with a lightweight HTTP server for local development",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "netlify dev"
   },
   "author": "teknoflame",
   "license": "MIT",
@@ -12,5 +13,8 @@
     "@netlify/functions": "^5.1.2",
     "jose": "^6.1.3",
     "pg": "^8.18.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^26.0.1"
   }
 }
