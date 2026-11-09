@@ -14,3 +14,6 @@ Thumbs.db
 
 # Netlify
 .netlify/
+
+# Local dev server log
+netlify-dev.log

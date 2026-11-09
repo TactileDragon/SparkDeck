@@ -48,7 +48,7 @@ exports.handler = async function (event) {
 
         // Also ensure default settings exist for this user.
         // Wrapped in try/catch because user_settings table may not exist yet
-        // (user needs to run setup-database first to create it).
+        // (see migrations/ for how schema changes are applied).
         try {
             await query(
                 `INSERT INTO user_settings (user_id)
