@@ -7,7 +7,7 @@ Each file is numbered. You run them yourself, in order, in Neon's SQL Editor. Th
 ## The files
 
 - `000_schema_migrations.sql`: creates the tracking table and records the two changes below.
-- `001_baseline.sql`: a record of how the tables looked before this folder existed. It will be written from the real schema in Neon.
+- `001_baseline.sql`: a record of how the tables looked before this folder existed, read from the live database on 2026-11-09. Recorded, not run.
 - `002_deck_shuffle.sql`: the shuffle column. Already applied, kept here as a record.
 
 ## How to apply a new migration
