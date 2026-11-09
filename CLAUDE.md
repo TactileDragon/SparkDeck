@@ -70,7 +70,6 @@ Flashcards-app/
 │   ├── correct.mp3
 │   └── wrong.mp3
 ├── migrations/                 # Numbered SQL files, run by hand in Neon's SQL Editor
-├── test-api.html               # Full API test page (requires login)
 ├── CLAUDE.md                   # This file - AI assistant guide
 ├── README.md                   # User-facing documentation
 ├── MIGRATION_PLAN.md           # Architecture migration documentation
@@ -305,6 +304,8 @@ class SparkDeckApp {
 - Every migration runs inside `BEGIN; ... COMMIT;` and ends by inserting its own row into `schema_migrations`.
 - Every migration file includes a read-only preflight check, a verification query that returns one row, and undo SQL in a comment.
 - Write verification queries so they return a single row, ideally with a PASS/FAIL column. The developer uses JAWS, and one row is far easier to read than a grid.
+- The developer has connected the Neon and Netlify connectors, and assistants may use them, on one condition: before each action, say in plain words exactly what you are about to run or change, and afterwards report the result. Read-only queries are fine. Anything that writes to the database or changes a Netlify setting needs the developer's go-ahead first, and always make a Neon snapshot branch before a schema change.
+- Neon project "SparkDeck", branch `production`, database `neondb`. That branch only keeps about one day of history, so snapshot branches are the real undo button. Local `npx netlify dev` most likely points at this same production database.
 
 ### Security Model
 
@@ -478,12 +479,6 @@ npx netlify dev        # Serves on port 8888, loads .env.local, runs functions
 npm start              # Uses server.js on port 8000
 ```
 
-**Testing API Endpoints**:
-1. Run `npx netlify dev`
-2. Log in via the main app
-3. Visit `http://localhost:8888/test-api.html`
-4. Test `api-user` and `api-data` endpoints
-
 ### File Editing Guidelines
 
 **When modifying `app.js`**:
@@ -572,10 +567,6 @@ npm start              # Uses server.js on port 8000
 3. **Cloud Sync Testing**: Data persistence across devices/sessions
 4. **Accessibility Testing**: Keyboard navigation, screen readers, themes
 5. **Cross-Browser Testing**: Chrome, Firefox, Safari, Edge
-
-### Test Pages
-
-- `test-api.html` - Test all API endpoints after Firebase login
 
 ### Test Checklist for New Features
 
