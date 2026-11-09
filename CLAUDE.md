@@ -60,9 +60,6 @@ Flashcards-app/
 │   └── functions/
 │       ├── api-data.js         # Bulk data sync endpoint (GET/PUT all user data)
 │       ├── api-user.js         # User registration/login sync
-│       ├── setup-database.js   # Schema migrations (admin only)
-│       ├── test-connection.js  # DB connectivity test (admin only)
-│       ├── check-schema.js     # Schema inspector (admin only)
 │       └── utils/
 │           ├── auth.js         # Firebase token verification (JWT/RSA)
 │           └── db.js           # PostgreSQL connection pool
@@ -72,7 +69,7 @@ Flashcards-app/
 │   ├── exit-study.mp3
 │   ├── correct.mp3
 │   └── wrong.mp3
-├── test-db.html                # Database connectivity test page
+├── migrations/                 # Numbered SQL files, run by hand in Neon's SQL Editor
 ├── test-api.html               # Full API test page (requires login)
 ├── CLAUDE.md                   # This file - AI assistant guide
 ├── README.md                   # User-facing documentation
@@ -300,13 +297,22 @@ class SparkDeckApp {
 | `user_settings` | `user_id`, `dark_mode`, `font_size`, `high_contrast`, `reduced_motion`, `stats_enabled` | Per-user preferences |
 | `study_sessions` | `user_id`, `deck_name`, `cards_studied`, `studied_at` | Study analytics |
 
+### Database Migrations (rules for AI assistants)
+
+- Schema changes live in `migrations/` as numbered SQL files (`003_short_name.sql`, and so on). Follow `migrations/README.md`.
+- The developer runs each file by hand in Neon's SQL Editor. Never add an HTTP endpoint, Netlify Function, or startup code that changes the schema.
+- Never write `DROP COLUMN`, `DROP TABLE`, or `TRUNCATE` against a table that holds user data. If a column's type must change, add a new column, copy the data, verify it, then switch the code over.
+- Every migration runs inside `BEGIN; ... COMMIT;` and ends by inserting its own row into `schema_migrations`.
+- Every migration file includes a read-only preflight check, a verification query that returns one row, and undo SQL in a comment.
+- Write verification queries so they return a single row, ideally with a PASS/FAIL column. The developer uses JAWS, and one row is far easier to read than a grid.
+
 ### Security Model
 
 1. **Firebase Token Verification**: RSA-SHA256 signature validation against Google's public certificates
 2. **Database Isolation**: All queries filtered by `user_id` — users only access their own data
 3. **SQL Injection Prevention**: Parameterized queries throughout
-4. **Admin Functions Protected**: `setup-database`, `test-connection`, `check-schema` require `ADMIN_SECRET` header
-5. **Secrets Server-Side Only**: `DATABASE_URL` and `ADMIN_SECRET` never exposed to frontend
+4. **No Schema Changes Over HTTP**: There is no migration endpoint. Schema changes are numbered SQL files in `migrations/`, reviewed and run by hand in Neon's SQL Editor (see `migrations/README.md`)
+5. **Secrets Server-Side Only**: `DATABASE_URL` is never exposed to the frontend
 6. **SSL Required**: Neon enforces SSL connections
 
 ---
@@ -441,13 +447,10 @@ Sophisticated exam-like quiz system with three modes:
 # Neon Database (used by Netlify Functions only)
 DATABASE_URL='postgresql://user:pass@your-neon-host/your-db?sslmode=require'
 
-# Admin functions protection
-ADMIN_SECRET='your-secret-for-diagnostic-tools'
 ```
 
 **Production** (Netlify Dashboard > Site Settings > Environment):
 - `DATABASE_URL` - Neon PostgreSQL connection string
-- `ADMIN_SECRET` - Admin endpoint protection
 
 **Firebase config** is in `firebase-config.js` (public, safe to commit).
 
@@ -474,11 +477,6 @@ npx netlify dev        # Serves on port 8888, loads .env.local, runs functions
 ```bash
 npm start              # Uses server.js on port 8000
 ```
-
-**Testing Database Connection**:
-1. Run `npx netlify dev`
-2. Visit `http://localhost:8888/test-db.html`
-3. Click "Test Database Connection"
 
 **Testing API Endpoints**:
 1. Run `npx netlify dev`
@@ -577,7 +575,6 @@ npm start              # Uses server.js on port 8000
 
 ### Test Pages
 
-- `test-db.html` - Verify Neon PostgreSQL connectivity (requires `ADMIN_SECRET`)
 - `test-api.html` - Test all API endpoints after Firebase login
 
 ### Test Checklist for New Features
@@ -651,7 +648,7 @@ const mode = await this.openQuizModeModal();
 2. Update `renderDecks()` or relevant render method
 3. Update `api-data.js` GET handler to return the new field
 4. Update `api-data.js` PUT handler to save the new field
-5. Add database column via `setup-database.js` migration
+5. Add the database column with a new numbered file in `migrations/` (see `migrations/README.md`); the developer runs it by hand in Neon's SQL Editor
 6. Provide defaults for existing decks: `deck.newProp = deck.newProp || defaultValue`
 
 ### Adding a New User Setting
@@ -661,7 +658,7 @@ const mode = await this.openQuizModeModal();
 3. Add UI control in `index.html` Settings tab
 4. Add CSS if visual (e.g., theme)
 5. Update `api-data.js` to include in settings GET/PUT
-6. Add column to `user_settings` table via `setup-database.js`
+6. Add the `user_settings` column with a new numbered file in `migrations/`
 
 ### Adding a Keyboard Shortcut
 
@@ -751,7 +748,6 @@ this.syncToCloud();    // Debounced PUT to api-data (2-second delay)
 **Solution**:
 - Check browser console for errors
 - Verify `.env.local` has `DATABASE_URL` set
-- Test connection via `test-db.html`
 - Try logging out and back in (refreshes token)
 - Data is safe in localStorage as fallback
 
@@ -762,12 +758,6 @@ this.syncToCloud();    // Debounced PUT to api-data (2-second delay)
 **Solution**:
 1. Use `npx netlify dev` (serves on http://localhost:8888)
 2. Check browser extensions (some strip Referer)
-
-### Issue: Admin functions return 401
-
-**Cause**: Missing or wrong `ADMIN_SECRET` header.
-
-**Solution**: Ensure `ADMIN_SECRET` is set in `.env.local` and passed as header in requests.
 
 ### Issue: Screen reader not announcing
 

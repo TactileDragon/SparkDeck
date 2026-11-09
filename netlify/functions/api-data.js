@@ -2,7 +2,7 @@
 //
 // Bulk data sync endpoint. Loads or saves ALL user data in one request.
 //
-// Actual database schema (discovered via check-schema):
+// Actual database schema (see migrations/ for its history):
 //   - users:          id (UUID), firebase_uid, email
 //   - folders:        id (INTEGER auto), name, parent_folder_id (INTEGER), user_id (UUID)
 //   - decks:          id (INTEGER auto), name, category, description, visibility,
