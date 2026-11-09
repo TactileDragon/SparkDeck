@@ -14,7 +14,7 @@ Each file is numbered. You run them yourself, in order, in Neon's SQL Editor. Th
 
 Every file has the same parts, in the same order: preflight, change, verify, and undo. You paste one part at a time into Neon's SQL Editor and run it.
 
-1. **Make a snapshot.** In the Neon Console, open the SparkDeck project and go to Branches. Create a branch from the main branch using its current data, and name it `backup-` followed by today's date. This is your undo button for the whole database.
+1. **Make a snapshot.** In the Neon Console, open the SparkDeck project and go to Branches. Create a branch from the `production` branch using its current data, and name it `backup-` followed by today's date. This is your undo button for the whole database.
 2. **Run the preflight.** Copy the PREFLIGHT part of the file, paste it into the SQL Editor, and run it. It only reads data. Read the single row it returns and compare it with the expected result written in the file. If it doesn't match, stop.
 3. **Run the change.** Copy everything from `BEGIN;` to `COMMIT;` and run it. If any line errors, nothing is saved. Run `ROLLBACK;` on its own to clear the error, and stop.
 4. **Run the verify query.** It returns one row, with a column named `result` that says PASS or FAIL.
