@@ -36,6 +36,68 @@
     const signOutBtn = document.getElementById('sign-out-btn');
     const userEmailDisplay = document.getElementById('user-email-display');
 
+    // Email verification banner
+    const verifyBanner = document.getElementById('verify-email-banner');
+    const verifyEmailAddress = document.getElementById('verify-email-address');
+    const verifyCheckBtn = document.getElementById('verify-check-btn');
+    const verifyResendBtn = document.getElementById('verify-resend-btn');
+    const verifyStatus = document.getElementById('verify-email-status');
+
+    // Password rule checklist (signup form)
+    const passwordRuleList = document.getElementById('password-requirements');
+
+    // ---- Validation Rules ----
+
+    // A complete address: something@domain.tld, where the last part has at
+    // least two letters. Rejects things like "abc@a" or "abc@a." that the
+    // browser and Firebase would otherwise accept.
+    var EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[A-Za-z]{2,}$/;
+
+    var PASSWORD_MIN = 8;
+    var PASSWORD_MAX = 64;
+    // Symbols we accept, listed in the signup form so users know exactly what counts.
+    var PASSWORD_SPECIALS = '!@#$%^&*()-_=+[]{};:,.?/~';
+
+    var PASSWORD_RULES = [
+        { id: 'length',  label: '8 to 64 characters',
+          test: function (p) { return p.length >= PASSWORD_MIN && p.length <= PASSWORD_MAX; } },
+        { id: 'upper',   label: 'an uppercase letter',
+          test: function (p) { return /[A-Z]/.test(p); } },
+        { id: 'lower',   label: 'a lowercase letter',
+          test: function (p) { return /[a-z]/.test(p); } },
+        { id: 'number',  label: 'a number',
+          test: function (p) { return /[0-9]/.test(p); } },
+        { id: 'special', label: 'one of the listed symbols',
+          test: function (p) {
+              for (var i = 0; i < p.length; i++) {
+                  if (PASSWORD_SPECIALS.indexOf(p[i]) !== -1) return true;
+              }
+              return false;
+          } }
+    ];
+
+    function isValidEmail(email) {
+        return EMAIL_PATTERN.test(email);
+    }
+
+    function getUnmetPasswordRules(password) {
+        return PASSWORD_RULES.filter(function (rule) { return !rule.test(password); });
+    }
+
+    // Update the visible checklist under the password field. Each item gets a
+    // text status (not just a color) so it reads correctly with a screen reader.
+    function updatePasswordChecklist(password) {
+        if (!passwordRuleList) return;
+        PASSWORD_RULES.forEach(function (rule) {
+            var item = passwordRuleList.querySelector('[data-rule="' + rule.id + '"]');
+            if (!item) return;
+            var met = rule.test(password);
+            item.classList.toggle('rule-met', met);
+            var status = item.querySelector('.rule-status');
+            if (status) status.textContent = met ? '(done)' : '(not met yet)';
+        });
+    }
+
     // ---- Helper Functions ----
 
     function announce(message) {
@@ -76,7 +138,8 @@
             case 'auth/invalid-email':
                 return 'Please enter a valid email address.';
             case 'auth/weak-password':
-                return 'Password must be at least 6 characters long.';
+            case 'auth/password-does-not-meet-requirements':
+                return 'That password is too weak. Please follow the password rules listed under the password field.';
             case 'auth/user-not-found':
                 return 'No account found with this email. Try signing up instead.';
             case 'auth/wrong-password':
@@ -217,8 +280,19 @@
             return;
         }
 
-        if (password.length < 6) {
-            showError('Password must be at least 6 characters long.');
+        if (!isValidEmail(email)) {
+            showError('Please enter a complete email address, like name@example.com.');
+            signupEmail.focus();
+            return;
+        }
+
+        var unmet = getUnmetPasswordRules(password);
+        if (unmet.length > 0) {
+            var missing = unmet.map(function (rule) { return rule.label; });
+            var list = missing.length === 1
+                ? missing[0]
+                : missing.slice(0, -1).join(', ') + ' and ' + missing[missing.length - 1];
+            showError('Your password still needs ' + list + '.');
             signupPassword.focus();
             return;
         }
@@ -232,8 +306,15 @@
         setLoading(signupSubmitBtn, true);
 
         auth.createUserWithEmailAndPassword(email, password)
-            .then(function () {
-                announce('Account created successfully! Welcome to SparkDeck.');
+            .then(function (credential) {
+                announce('Account created! We sent a verification link to your email.');
+                // Send the verification email. Failure here is non-fatal:
+                // the banner offers a "Resend" button.
+                if (credential && credential.user) {
+                    return credential.user.sendEmailVerification().catch(function (err) {
+                        console.warn('Could not send verification email:', err);
+                    });
+                }
             })
             .catch(function (error) {
                 showError(getFriendlyError(error.code));
@@ -257,6 +338,12 @@
             return;
         }
 
+        if (!isValidEmail(email)) {
+            showError('Please enter a complete email address, like name@example.com.');
+            loginEmail.focus();
+            return;
+        }
+
         setLoading(loginSubmitBtn, true);
 
         auth.signInWithEmailAndPassword(email, password)
@@ -270,6 +357,82 @@
                 setLoading(loginSubmitBtn, false);
             });
     });
+
+    // ---- Password Checklist ----
+
+    signupPassword.addEventListener('input', function () {
+        updatePasswordChecklist(signupPassword.value);
+    });
+
+    // ---- Email Verification Banner ----
+    // Unverified users can still use the app. The banner just reminds them,
+    // and lets them resend the email or re-check once they've clicked the link.
+
+    function setVerifyStatus(message) {
+        if (verifyStatus) verifyStatus.textContent = message;
+    }
+
+    function updateVerifyBanner(user) {
+        if (!verifyBanner) return;
+        if (user && !user.emailVerified) {
+            if (verifyEmailAddress) verifyEmailAddress.textContent = user.email || 'your email address';
+            verifyBanner.classList.remove('hidden');
+        } else {
+            verifyBanner.classList.add('hidden');
+            setVerifyStatus('');
+        }
+    }
+
+    if (verifyResendBtn) {
+        verifyResendBtn.addEventListener('click', function () {
+            var user = auth.currentUser;
+            if (!user) return;
+            setLoading(verifyResendBtn, true);
+            user.sendEmailVerification()
+                .then(function () {
+                    setVerifyStatus('Verification email sent to ' + user.email + '. It can take a few minutes to arrive.');
+                })
+                .catch(function (error) {
+                    if (error && error.code === 'auth/too-many-requests') {
+                        setVerifyStatus('We already sent a few emails recently. Please wait a few minutes before asking for another.');
+                    } else {
+                        setVerifyStatus('Sorry, we could not send the email right now. Please try again later.');
+                    }
+                })
+                .finally(function () {
+                    setLoading(verifyResendBtn, false);
+                });
+        });
+    }
+
+    if (verifyCheckBtn) {
+        verifyCheckBtn.addEventListener('click', function () {
+            var user = auth.currentUser;
+            if (!user) return;
+            setLoading(verifyCheckBtn, true);
+            // reload() fetches the latest account info, including emailVerified.
+            user.reload()
+                .then(function () {
+                    var refreshed = auth.currentUser;
+                    if (refreshed && refreshed.emailVerified) {
+                        // Refresh the ID token so the server sees the verified status too.
+                        refreshed.getIdToken(true).catch(function () {});
+                        updateVerifyBanner(refreshed);
+                        announce('Thank you! Your email address is verified.');
+                        var heading = appContainer.querySelector('h1');
+                        if (heading) heading.focus();
+                    } else {
+                        setVerifyStatus('Your email is not verified yet. Open the link in the email we sent, then try this button again.');
+                    }
+                })
+                .catch(function () {
+                    setVerifyStatus('Could not check right now. Please check your internet connection and try again.');
+                })
+                .finally(function () {
+                    setLoading(verifyCheckBtn, false);
+                });
+        });
+    }
 
     // ---- Sign Out ----
 
@@ -298,6 +461,8 @@
             if (userEmailDisplay) {
                 userEmailDisplay.textContent = user.email;
             }
+
+            updateVerifyBanner(user);
 
             // Initialize SparkDeckApp if it hasn't been created yet
             if (!window.app) {
@@ -335,9 +500,12 @@
                 authHeading.focus();
             }
 
+            updateVerifyBanner(null);
+
             // Reset forms
             loginForm.reset();
             signupForm.reset();
+            updatePasswordChecklist('');
             clearError();
 
             // Show login form by default

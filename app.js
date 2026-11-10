@@ -166,6 +166,7 @@ class SparkDeckApp {
         this.manualInput = document.getElementById('manual-input');
         this.notesInput = document.getElementById('notes-input');
         this.generateBtn = document.getElementById('generate-btn');
+        this.generateStatus = document.getElementById('generate-status');
         this.cardFront = document.getElementById('card-front');
         this.cardBack = document.getElementById('card-back');
         this.cardMediaInput = document.getElementById('card-media');
@@ -184,6 +185,7 @@ class SparkDeckApp {
         this.progressFill = document.getElementById('progress-fill');
         this.flashcard = document.getElementById('flashcard');
         this.cardContent = document.getElementById('card-content');
+        this.cardMediaArea = document.getElementById('card-media-area');
         this.prevBtn = document.getElementById('prev-btn');
         this.flipBtn = document.getElementById('flip-btn');
         this.nextBtn = document.getElementById('next-btn');
@@ -231,7 +233,7 @@ class SparkDeckApp {
 
         // Vision settings elements
         this.darkModeBtn = document.getElementById('dark-mode-btn');
-        this.fontSizeBtn = document.getElementById('font-size-btn');
+        this.fontSizeGroup = document.getElementById('font-size-group');
         this.highContrastBtn = document.getElementById('high-contrast-btn');
         this.reducedMotionBtn = document.getElementById('reduced-motion-btn');
 
@@ -271,6 +273,8 @@ class SparkDeckApp {
         // Import/Export buttons (Settings)
         this.importBtn = document.getElementById('import-btn');
         this.exportAllBtn = document.getElementById('export-all-btn');
+        this.exportCsvBtn = document.getElementById('export-csv-btn');
+        this.exportTextBtn = document.getElementById('export-text-btn');
     }
 
     setupEventListeners() {
@@ -448,8 +452,12 @@ class SparkDeckApp {
         if (this.darkModeBtn) {
             this.darkModeBtn.addEventListener('click', () => this.toggleDarkMode());
         }
-        if (this.fontSizeBtn) {
-            this.fontSizeBtn.addEventListener('click', () => this.cycleFontSize());
+        if (this.fontSizeGroup) {
+            this.fontSizeGroup.addEventListener('change', (e) => {
+                if (e.target && e.target.name === 'font-size') {
+                    this.setFontSize(e.target.value);
+                }
+            });
         }
         if (this.highContrastBtn) {
             this.highContrastBtn.addEventListener('click', () => this.toggleHighContrast());
@@ -496,6 +504,12 @@ class SparkDeckApp {
         // Import/Export buttons (Settings)
         if (this.exportAllBtn) {
             this.exportAllBtn.addEventListener('click', () => this.exportAllData());
+        }
+        if (this.exportCsvBtn) {
+            this.exportCsvBtn.addEventListener('click', () => this.exportAllAsCSV());
+        }
+        if (this.exportTextBtn) {
+            this.exportTextBtn.addEventListener('click', () => this.exportAllAsText());
         }
         if (this.importBtn) {
             this.importBtn.addEventListener('click', () => this.triggerImport());
@@ -854,11 +868,10 @@ class SparkDeckApp {
         this.darkModeBtn.setAttribute('aria-label', isOn ? 'Dark mode enabled. Click to disable.' : 'Dark mode disabled. Click to enable.');
     }
 
-    cycleFontSize() {
+    setFontSize(size) {
         const sizes = ['small', 'medium', 'large', 'extra-large'];
-        const currentIndex = sizes.indexOf(this.settings.fontSize);
-        const nextIndex = (currentIndex + 1) % sizes.length;
-        this.settings.fontSize = sizes[nextIndex];
+        if (!sizes.includes(size) || size === this.settings.fontSize) return;
+        this.settings.fontSize = size;
         this.saveSettings();
         this.applyFontSize();
         this.updateFontSizeButton();
@@ -874,11 +887,11 @@ class SparkDeckApp {
     }
 
     updateFontSizeButton() {
-        if (!this.fontSizeBtn) return;
-        const sizeLabels = { 'small': 'Small', 'medium': 'Medium', 'large': 'Large', 'extra-large': 'Extra Large' };
-        const label = sizeLabels[this.settings.fontSize] || 'Medium';
-        this.fontSizeBtn.textContent = label;
-        this.fontSizeBtn.setAttribute('aria-label', `Font size: ${label}. Click to change.`);
+        if (!this.fontSizeGroup) return;
+        const current = this.settings.fontSize || 'medium';
+        this.fontSizeGroup.querySelectorAll('input[name="font-size"]').forEach(radio => {
+            radio.checked = radio.value === current;
+        });
     }
 
     toggleHighContrast() {
@@ -1765,6 +1778,7 @@ class SparkDeckApp {
 
         const safeName = this.escapeHtml(deck.name);
         const safeCategory = this.escapeHtml(deck.category);
+        const quizBlocked = deck.cards.length < 4;
         deckEl.innerHTML = `
             <div class="deck-header">
                 <h4 id="deck-title-${deckIndex}" class="deck-title">${safeName}</h4>
@@ -1782,7 +1796,7 @@ class SparkDeckApp {
                          aria-labelledby="${menuBtnId}"
                          hidden>
                         <button type="button" role="menuitem" class="deck-menu-item" data-action="study" data-deck-index="${deckIndex}">Study</button>
-                        <button type="button" role="menuitem" class="deck-menu-item" data-action="quiz" data-deck-index="${deckIndex}" ${deck.cards.length < 4 ? 'disabled' : ''}>Quiz</button>
+                        <button type="button" role="menuitem" class="deck-menu-item" data-action="quiz" data-deck-index="${deckIndex}" ${quizBlocked ? `disabled aria-describedby="quiz-note-${deckIndex}"` : ''}>Quiz${quizBlocked ? ' (needs 4 cards)' : ''}</button>
                         <button type="button" role="menuitem" class="deck-menu-item" data-action="edit" data-deck-index="${deckIndex}">Edit Cards</button>
                         <button type="button" role="menuitem" class="deck-menu-item" data-action="export" data-deck-index="${deckIndex}">Export</button>
                         <button type="button" role="menuitem" class="deck-menu-item" data-action="move" data-deck-index="${deckIndex}">Move to Folder…</button>
@@ -1792,11 +1806,12 @@ class SparkDeckApp {
                     </div>
                 </div>
             </div>
-            <p>${deck.cards.length} cards &bull; ${safeCategory}${deck.shuffle === false ? ' &bull; Sequential' : ''}</p>
+            <p>${deck.cards.length} card${deck.cards.length !== 1 ? 's' : ''} &bull; ${safeCategory}${deck.shuffle === false ? ' &bull; Sequential' : ''}</p>
             <div class="button-group deck-actions">
                 <button type="button" class="deck-study-btn" data-deck-index="${deckIndex}" aria-label="Study deck ${safeName}">Study</button>
-                <button type="button" class="deck-quiz-btn" data-deck-index="${deckIndex}" aria-label="Quiz deck ${safeName}" ${deck.cards.length < 4 ? 'disabled title="Need at least 4 cards for quiz"' : ''}>Quiz</button>
+                <button type="button" class="deck-quiz-btn" data-deck-index="${deckIndex}" aria-label="Quiz deck ${safeName}" ${quizBlocked ? `disabled aria-describedby="quiz-note-${deckIndex}"` : ''}>Quiz</button>
             </div>
+            ${quizBlocked ? `<p id="quiz-note-${deckIndex}" class="quiz-disabled-note">Quiz unlocks at 4 cards. This deck has ${deck.cards.length}, so add ${4 - deck.cards.length} more with Edit Cards in the ⋮ menu.</p>` : ''}
         `;
 
         // Setup menu button
@@ -2131,23 +2146,48 @@ class SparkDeckApp {
         }
     }
 
+    // Show a visible message under the Generate button. The element is a
+    // role="status" live region, so screen readers hear it too.
+    setGenerateStatus(message, type) {
+        if (!this.generateStatus) return;
+        this.generateStatus.classList.remove('is-error', 'is-success');
+        if (type) this.generateStatus.classList.add(`is-${type}`);
+        this.generateStatus.textContent = message || '';
+    }
+
     generateCards() {
         const notes = this.notesInput.value.trim();
         if (!notes) {
-            this.announce('Please paste your study notes first.');
+            this.setGenerateStatus('Please paste your study notes into the box above first.', 'error');
             this.notesInput.focus();
             return;
         }
 
-        this.tempCards = this.parseNotes(notes);
+        const newCards = this.parseNotes(notes);
 
-        if (this.tempCards.length === 0) {
-            this.announce('No flashcards could be generated. Please check your notes format.');
+        if (newCards.length === 0) {
+            this.setGenerateStatus(
+                'No cards could be made from these notes. Put each item on its own line, as either a question ending in a question mark with the answer on the next line, "Term: definition", or "Term - definition". Open Help for more examples.',
+                'error'
+            );
+            this.soundManager.play('wrong');
             return;
         }
 
+        // Add to any cards already in this deck instead of replacing them.
+        this.tempCards = (this.tempCards || []).concat(newCards);
         this.showPreview();
-        this.announce(`Successfully generated ${this.tempCards.length} flashcards.`);
+
+        const made = `${newCards.length} card${newCards.length !== 1 ? 's' : ''}`;
+        this.setGenerateStatus(
+            `Made ${made}. This deck now has ${this.tempCards.length} card${this.tempCards.length !== 1 ? 's' : ''}. Check them in the Cards Preview below, then select Save Deck. Cards are not saved until you do.`,
+            'success'
+        );
+        if (this.cardsPreview && typeof this.cardsPreview.scrollIntoView === 'function') {
+            const reduce = this.settings.reducedMotion ||
+                (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            this.cardsPreview.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+        }
     }
 
     parseNotes(notes) {
@@ -2171,6 +2211,17 @@ class SparkDeckApp {
                     const definition = lines[i + 1];
                     cards.push({ front: `What is ${term}?`, back: definition });
                     i++;
+                }
+            }
+            else if (/\s[-\u2013\u2014]\s/.test(line) && !line.includes('?') && !line.includes(':')) {
+                // "Term - definition" (hyphen, en dash, or em dash with spaces around it)
+                const match = line.match(/^(.+?)\s[-\u2013\u2014]\s(.+)$/);
+                if (match) {
+                    const term = match[1].trim();
+                    const definition = match[2].trim();
+                    if (term && definition.length > 10) {
+                        cards.push({ front: `What is ${term}?`, back: definition });
+                    }
                 }
             }
             else if (line.includes(':') && !line.includes('?')) {
@@ -2247,6 +2298,7 @@ class SparkDeckApp {
                 </div>
                 <p><strong>Front:</strong> ${this.escapeHtml(card.front)}</p>
                 <p><strong>Back:</strong> ${this.escapeHtml(card.back)}</p>
+                ${card.mediaUrl ? `<p><strong>Link:</strong> ${this.escapeHtml(card.mediaUrl)}</p>` : ''}
             `;
             cardElement.querySelector('.card-edit-btn').addEventListener('click', () => this.editCard(index));
             cardElement.querySelector('.card-remove-btn').addEventListener('click', () => this.removeCard(index));
@@ -2347,6 +2399,7 @@ class SparkDeckApp {
     }
 
     resetCreateForm() {
+        this.setGenerateStatus('');
         this.deckName.value = '';
         this.deckCategory.value = 'Biology';
         this.notesInput.value = '';
@@ -2451,12 +2504,104 @@ class SparkDeckApp {
         const side = this.showingFront ? 'front' : 'back';
 
         this.cardContent.textContent = content;
+        const hasMedia = !this.showingFront && this.getSafeMediaUrl(card.mediaUrl);
         this.flashcard.setAttribute('aria-label',
-            `Card ${this.currentCardIndex + 1} of ${this.currentDeck.cards.length}, showing ${side}. ${content}. Press Space or Enter to flip.`
+            `Card ${this.currentCardIndex + 1} of ${this.currentDeck.cards.length}, showing ${side}. ${content}.${hasMedia ? ' This card has a video link below.' : ''} Press Space or Enter to flip.`
         );
+        this.renderCardMedia(card);
 
         this.prevBtn.disabled = this.currentCardIndex === 0;
         this.nextBtn.disabled = this.currentCardIndex === this.currentDeck.cards.length - 1;
+    }
+
+    // Only allow http(s) links; anything else is ignored.
+    getSafeMediaUrl(url) {
+        if (typeof url !== 'string') return null;
+        const trimmed = url.trim();
+        return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+    }
+
+    // Returns the 11-character video ID for common YouTube link formats, or null.
+    getYouTubeId(url) {
+        try {
+            const u = new URL(url);
+            const host = u.hostname.replace(/^www\.|^m\./, '');
+            let id = null;
+            if (host === 'youtu.be') {
+                id = u.pathname.slice(1).split('/')[0];
+            } else if (host === 'youtube.com' || host === 'youtube-nocookie.com' || host === 'music.youtube.com') {
+                if (u.pathname === '/watch') id = u.searchParams.get('v');
+                else {
+                    const m = u.pathname.match(/^\/(embed|shorts|live|v)\/([^/?#]+)/);
+                    if (m) id = m[2];
+                }
+            }
+            return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    // Show the card's link under the flashcard, on the back side only.
+    renderCardMedia(card) {
+        const area = this.cardMediaArea;
+        if (!area) return;
+        area.innerHTML = '';
+        const url = this.showingFront ? null : this.getSafeMediaUrl(card && card.mediaUrl);
+        if (!url) {
+            area.classList.add('hidden');
+            return;
+        }
+        area.classList.remove('hidden');
+
+        const youTubeId = this.getYouTubeId(url);
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = youTubeId ? 'Open the video on YouTube (opens in a new tab)' : 'Open the linked resource (opens in a new tab)';
+
+        if (youTubeId) {
+            const playBtn = document.createElement('button');
+            playBtn.type = 'button';
+            playBtn.className = 'secondary-btn';
+            playBtn.textContent = 'Play video here';
+            playBtn.setAttribute('aria-expanded', 'false');
+            playBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const existing = area.querySelector('.media-embed-wrapper');
+                if (existing) {
+                    existing.remove();
+                    playBtn.textContent = 'Play video here';
+                    playBtn.setAttribute('aria-expanded', 'false');
+                    return;
+                }
+                const wrapper = document.createElement('div');
+                wrapper.className = 'media-embed-wrapper';
+                const iframe = document.createElement('iframe');
+                iframe.src = `https://www.youtube-nocookie.com/embed/${youTubeId}`;
+                iframe.title = 'Video for this card';
+                iframe.allow = 'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+                iframe.allowFullscreen = true;
+                iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+                wrapper.appendChild(iframe);
+                area.appendChild(wrapper);
+                playBtn.textContent = 'Hide video';
+                playBtn.setAttribute('aria-expanded', 'true');
+                iframe.focus();
+            });
+            const row = document.createElement('div');
+            row.className = 'button-group';
+            row.style.justifyContent = 'center';
+            row.style.alignItems = 'center';
+            row.appendChild(playBtn);
+            row.appendChild(link);
+            area.appendChild(row);
+        } else {
+            const p = document.createElement('p');
+            p.appendChild(link);
+            area.appendChild(p);
+        }
     }
 
     flipCard() {
@@ -2467,8 +2612,10 @@ class SparkDeckApp {
         this.displayCurrentCard();
 
         const side = this.showingFront ? 'front' : 'back';
-        const content = this.currentDeck.cards[this.currentCardIndex][this.showingFront ? 'front' : 'back'];
-        this.announce(`Flipped to ${side}: ${content}`);
+        const currentCard = this.currentDeck.cards[this.currentCardIndex];
+        const content = currentCard[this.showingFront ? 'front' : 'back'];
+        const mediaNote = !this.showingFront && this.getSafeMediaUrl(currentCard.mediaUrl) ? ' This card has a video link below.' : '';
+        this.announce(`Flipped to ${side}: ${content}.${mediaNote}`);
     }
 
     previousCard() {
@@ -2494,6 +2641,10 @@ class SparkDeckApp {
     endStudy() {
         this.soundManager.play('exitStudy');
         this.currentDeck = null;
+        if (this.cardMediaArea) {
+            this.cardMediaArea.innerHTML = '';
+            this.cardMediaArea.classList.add('hidden');
+        }
 
         // Hide study overlay
         this.studyOverlay.classList.add('hidden');
@@ -3352,9 +3503,106 @@ SparkDeckApp.prototype.exportAllData = function() {
     this.announce(`Downloading ${filename}. Contains ${this.decks.length} decks and ${this.folders.length} folders.`);
 };
 
+// Helper: full folder path for a deck, like "Science / Biology", or "" at top level
+SparkDeckApp.prototype._getFolderPath = function(folderId) {
+    const names = [];
+    const seen = new Set();
+    let current = folderId ? this.folders.find(f => f.id === folderId) : null;
+    while (current && !seen.has(current.id)) {
+        seen.add(current.id);
+        names.unshift(current.name);
+        current = current.parentFolderId ? this.folders.find(f => f.id === current.parentFolderId) : null;
+    }
+    return names.join(' / ');
+};
+
+// Export all decks as a CSV spreadsheet: one row per card.
+SparkDeckApp.prototype.exportAllAsCSV = function() {
+    if (this.decks.length === 0) {
+        this.announce('No decks to export.');
+        return;
+    }
+    document.activeElement?.blur();
+
+    const cell = (value) => {
+        let text = value === undefined || value === null ? '' : String(value);
+        // Stop spreadsheet apps from treating card text as a formula.
+        if (/^[=+@\t\r]/.test(text) || /^-\S/.test(text)) text = "'" + text;
+        return '"' + text.replace(/"/g, '""') + '"';
+    };
+
+    const rows = [['Folder', 'Deck', 'Category', 'Card Number', 'Front', 'Back', 'Link']];
+    let cardTotal = 0;
+    this.decks.forEach(deck => {
+        const folder = this._getFolderPath(deck.folderId) || '(No folder)';
+        const cards = Array.isArray(deck.cards) ? deck.cards : [];
+        if (cards.length === 0) {
+            rows.push([folder, deck.name, deck.category || '', '', '', '', '']);
+        }
+        cards.forEach((card, i) => {
+            rows.push([folder, deck.name, deck.category || '', i + 1, card.front, card.back, card.mediaUrl || '']);
+            cardTotal++;
+        });
+    });
+
+    // Byte order mark so Excel opens accented characters and emoji correctly.
+    const csv = '\uFEFF' + rows.map(r => r.map(cell).join(',')).join('\r\n');
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `sparkdeck-cards-${date}.csv`;
+    this._downloadFile(csv, filename, 'text/csv;charset=utf-8');
+    this.announce(`Downloading ${filename}. Contains ${this.decks.length} decks and ${cardTotal} cards.`);
+};
+
+// Export all decks as a plain, human-readable text file.
+SparkDeckApp.prototype.exportAllAsText = function() {
+    if (this.decks.length === 0) {
+        this.announce('No decks to export.');
+        return;
+    }
+    document.activeElement?.blur();
+
+    const now = new Date();
+    const cardTotal = this.decks.reduce((sum, d) => sum + (Array.isArray(d.cards) ? d.cards.length : 0), 0);
+    const lines = [
+        'SparkDeck flashcards',
+        `Exported ${now.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`,
+        `${this.decks.length} deck${this.decks.length !== 1 ? 's' : ''}, ${cardTotal} card${cardTotal !== 1 ? 's' : ''}`,
+        ''
+    ];
+
+    this.decks.forEach(deck => {
+        const cards = Array.isArray(deck.cards) ? deck.cards : [];
+        const folder = this._getFolderPath(deck.folderId);
+        lines.push('========================================');
+        lines.push(`Deck: ${deck.name}`);
+        if (folder) lines.push(`Folder: ${folder}`);
+        lines.push(`Category: ${deck.category || 'None'}`);
+        lines.push(`Cards: ${cards.length}`);
+        lines.push('========================================');
+        lines.push('');
+        cards.forEach((card, i) => {
+            lines.push(`Card ${i + 1}`);
+            lines.push(`Front: ${card.front}`);
+            lines.push(`Back: ${card.back}`);
+            if (card.mediaUrl) lines.push(`Link: ${card.mediaUrl}`);
+            lines.push('');
+        });
+    });
+
+    const date = now.toISOString().split('T')[0];
+    const filename = `sparkdeck-cards-${date}.txt`;
+    this._downloadFile(lines.join('\r\n'), filename, 'text/plain;charset=utf-8');
+    this.announce(`Downloading ${filename}. Contains ${this.decks.length} decks and ${cardTotal} cards.`);
+};
+
 // Helper: Download JSON data as file
 SparkDeckApp.prototype._downloadJSON = function(data, filename) {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    this._downloadFile(JSON.stringify(data, null, 2), filename, 'application/json');
+};
+
+// Helper: Download any text content as a file
+SparkDeckApp.prototype._downloadFile = function(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

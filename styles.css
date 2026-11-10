@@ -1751,3 +1751,433 @@ body.reduced-motion *::after {
         scroll-behavior: auto !important;
     }
 }
+
+/* ========================================
+   v1 revision fixes (visual audit, Nov 2026)
+   Kept at the end so these win over earlier rules.
+   ======================================== */
+
+/* --- Buttons: size to their label instead of stretching across the page --- */
+button {
+    width: auto;
+    padding: 10px 20px;
+}
+.button-group {
+    flex-wrap: wrap;
+}
+/* The main sign-in / sign-up button stays full width, like the fields above it */
+.auth-form button[type="submit"] {
+    width: 100%;
+}
+
+/* --- Tabs: labels always readable, selected or not --- */
+.nav-tabs {
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.nav-tab,
+.nav-tab:hover {
+    width: auto;
+    background: #ffffff;
+    color: #1f5f99;              /* 6.4:1 on white */
+    border: 2px solid transparent;
+    border-bottom: 3px solid transparent;
+    border-radius: 6px 6px 0 0;
+}
+.nav-tab:hover {
+    background: #eef5fb;
+    border-color: #c7dcef;
+}
+.nav-tab:focus-visible {
+    outline: 3px solid #1f5f99;
+    outline-offset: 2px;
+}
+.nav-tab.active,
+.nav-tab[aria-selected="true"] {
+    background: #ffffff;
+    color: #1f5f99;
+    border-color: #dee2e6;
+    border-bottom: 4px solid #1f5f99;
+    font-weight: 700;
+}
+
+body.dark-mode .nav-tab,
+body.dark-mode .nav-tab:hover {
+    background: #1f5f99;
+    color: #ffffff;              /* 6.4:1 on that blue */
+    border-color: #1f5f99;
+}
+body.dark-mode .nav-tab:hover {
+    background: #2a71b3;
+    border-color: #2a71b3;
+}
+body.dark-mode .nav-tab:focus-visible {
+    outline: 3px solid #ffffff;
+}
+body.dark-mode .nav-tab.active,
+body.dark-mode .nav-tab[aria-selected="true"] {
+    background: #0d3a63;
+    color: #ffffff;
+    border-color: #52b6e8;
+    border-bottom: 4px solid #ffffff;
+}
+
+body.high-contrast .nav-tab,
+body.high-contrast .nav-tab:hover {
+    background: #000000;
+    color: #ffffff;
+    border-color: #ffffff;
+}
+body.high-contrast .nav-tab.active,
+body.high-contrast .nav-tab[aria-selected="true"] {
+    background: #ffff00;
+    color: #000000;
+    border-color: #ffff00;
+}
+
+/* --- Help pop-up: left-aligned, top-aligned, readable line length --- */
+#help-modal {
+    margin: auto;
+    padding: 0;
+    border: none;
+    background: transparent;
+    max-width: none;
+    max-height: none;
+}
+#help-modal .modal-dialog {
+    width: min(860px, 94vw);
+    height: auto;
+    max-height: 90vh;
+}
+#help-modal .modal-header {
+    padding: 16px 24px;
+}
+#help-modal .modal-title {
+    margin: 0;
+}
+#help-modal .modal-body {
+    display: block;              /* was a vertically centered flex box, which cut off the top */
+    text-align: left;
+    padding: 8px 24px 24px;
+    overflow-y: auto;
+}
+#help-modal .modal-body h2 {
+    font-size: 1.25em;
+    margin: 28px 0 8px;
+    padding-top: 16px;
+    border-top: 1px solid #dee2e6;
+}
+#help-modal .modal-body h3 {
+    font-size: 1.05em;
+    margin: 18px 0 6px;
+}
+#help-modal .modal-body p {
+    margin: 0 0 10px;
+}
+#help-modal .modal-body ul,
+#help-modal .modal-body ol {
+    display: block;
+    margin: 0 0 12px 1.5em;
+    padding: 0;
+}
+#help-modal .modal-body li {
+    margin-bottom: 6px;
+}
+#help-modal .modal-body:focus-visible {
+    outline: 3px solid #1f5f99;
+    outline-offset: -3px;
+}
+#help-modal .close-btn {
+    width: auto;
+}
+body.dark-mode #help-modal .modal-body h2 {
+    border-top-color: var(--border-color);
+}
+
+/* --- Password rule checklist on the sign-up form --- */
+.password-rules-intro {
+    margin: 10px 0 4px;
+    font-size: 14px;
+    color: #495057;
+}
+.password-rules {
+    margin: 0 0 0 1.25em;
+    padding: 0;
+    font-size: 14px;
+    color: #495057;
+}
+.password-rules li {
+    margin-bottom: 2px;
+}
+.password-rules li.rule-met {
+    color: #1e7b34;
+}
+.password-rules .rule-status {
+    font-style: italic;
+}
+body.dark-mode .password-rules-intro,
+body.dark-mode .password-rules {
+    color: var(--text-secondary);
+}
+body.dark-mode .password-rules li.rule-met {
+    color: var(--success-color);
+}
+
+/* --- Email verification banner --- */
+.verify-banner {
+    background: #fff8e1;
+    border: 2px solid #b8860b;
+    border-left-width: 8px;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 0 0 24px;
+    color: #3d2f00;
+}
+.verify-banner h2 {
+    font-size: 1.15em;
+    margin: 0 0 6px;
+    color: #3d2f00;
+}
+.verify-banner p {
+    margin: 0 0 12px;
+}
+.verify-banner-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.verify-status:empty {
+    display: none;
+}
+.verify-status {
+    margin: 12px 0 0;
+    font-weight: 600;
+}
+body.dark-mode .verify-banner {
+    background: #3a2f0b;
+    border-color: var(--warning-color);
+    color: #fff3c4;
+}
+body.dark-mode .verify-banner h2 {
+    color: #fff3c4;
+}
+body.high-contrast .verify-banner {
+    background: #000;
+    border-color: #ffff00;
+    color: #fff;
+}
+body.high-contrast .verify-banner h2 {
+    color: #ffff00;
+}
+
+/* --- Visible status messages (card generation, etc.) --- */
+.inline-status {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    border-left: 6px solid #1f5f99;
+    background: #eef5fb;
+    color: #1b2a38;
+}
+.inline-status:empty {
+    display: none;
+}
+.inline-status.is-error {
+    border-left-color: #b02a37;
+    background: #fbeaec;
+    color: #5c1018;
+}
+.inline-status.is-success {
+    border-left-color: #1e7b34;
+    background: #e8f5ec;
+    color: #12401d;
+}
+body.dark-mode .inline-status {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-left-color: var(--accent-color);
+}
+body.dark-mode .inline-status.is-error {
+    border-left-color: var(--danger-color);
+    background: var(--danger-bg);
+}
+body.dark-mode .inline-status.is-success {
+    border-left-color: var(--success-color);
+    background: var(--success-bg);
+}
+body.high-contrast .inline-status {
+    background: #000;
+    color: #fff;
+    border: 2px solid #ffff00;
+}
+
+/* --- Small explanatory text under a setting or button --- */
+.setting-help,
+.quiz-disabled-note {
+    font-size: 14px;
+    color: #5a6570;
+    margin: 0 0 8px;
+}
+.quiz-disabled-note {
+    margin: 8px 0 0;
+}
+body.dark-mode .setting-help,
+body.dark-mode .quiz-disabled-note {
+    color: var(--text-muted);
+}
+body.high-contrast .setting-help,
+body.high-contrast .quiz-disabled-note {
+    color: #fff;
+}
+
+/* --- Font size segmented selector --- */
+.segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    border: 2px solid #1f5f99;
+    border-radius: 6px;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+}
+.segmented legend {
+    /* visually hidden; the setting label above names the group */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+}
+.segmented label {
+    position: relative;
+    margin: 0;
+    font-weight: 600;
+    cursor: pointer;
+}
+.segmented input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+}
+.segmented span {
+    display: block;
+    padding: 8px 14px;
+    background: #ffffff;
+    color: #1f5f99;
+    border-right: 1px solid #c7dcef;
+}
+.segmented label:last-of-type span {
+    border-right: none;
+}
+.segmented input:checked + span {
+    background: #1f5f99;
+    color: #ffffff;
+}
+.segmented input:focus-visible + span {
+    outline: 3px solid #f0a500;
+    outline-offset: -3px;
+}
+body.dark-mode .segmented {
+    border-color: var(--accent-color);
+}
+body.dark-mode .segmented span {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-right-color: var(--border-color);
+}
+body.dark-mode .segmented input:checked + span {
+    background: #1f5f99;
+    color: #ffffff;
+}
+body.high-contrast .segmented {
+    border-color: #ffff00;
+}
+body.high-contrast .segmented span {
+    background: #000;
+    color: #fff;
+}
+body.high-contrast .segmented input:checked + span {
+    background: #ffff00;
+    color: #000;
+}
+
+/* Settings rows that stack a description under the label */
+.setting-item.setting-item--stacked {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+}
+.setting-item .setting-label-group {
+    flex: 1 1 260px;
+}
+.setting-item .setting-label-group label {
+    margin-bottom: 2px;
+}
+
+/* --- Stats: summary sits between the filters and the cards --- */
+.stats-summary {
+    text-align: left;
+    margin: 0 0 20px;
+    color: #2c3e50;
+    font-size: 1.05em;
+}
+body.dark-mode .stats-summary {
+    color: var(--text-primary);
+}
+
+/* --- Media link on the back of a study card --- */
+.card-media {
+    margin: 12px 0 0;
+    text-align: center;
+}
+.card-media a {
+    color: #1f5f99;
+    font-weight: 600;
+}
+.card-media .media-embed-wrapper {
+    margin-top: 12px;
+}
+.card-media iframe {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: 6px;
+}
+body.dark-mode .card-media a {
+    color: var(--accent-hover);
+}
+body.high-contrast .card-media a {
+    color: #ffff00;
+}
+.export-heading {
+    margin: 20px 0 6px;
+    font-size: 16px;
+}
+.export-help {
+    margin: 0 0 12px 1.25em;
+    padding: 0;
+}
+.export-help li {
+    margin-bottom: 4px;
+}
+.verify-banner .secondary-btn {
+    background: #ffffff;
+    color: #3d2f00;
+    border-color: #b8860b;
+}
+.verify-banner .secondary-btn:hover,
+.verify-banner .secondary-btn:focus {
+    background: #fff3c4;
+    color: #3d2f00;
+    border-color: #8a6508;
+}
+body.dark-mode .verify-banner .secondary-btn {
+    background: transparent;
+    color: #fff3c4;
+    border-color: var(--warning-color);
+}
+body.dark-mode .verify-banner .secondary-btn:hover,
+body.dark-mode .verify-banner .secondary-btn:focus {
+    background: #4a3d10;
+    color: #ffffff;
+}
