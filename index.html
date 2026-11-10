@@ -2241,6 +2241,31 @@
             background: #4a3d10;
             color: #ffffff;
         }
+        .cloud-sync-status {
+            margin: 0 0 24px;
+        }
+        .csv-format-help {
+            margin: 0 0 12px;
+        }
+        .csv-format-help summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: #1f5f99;
+            margin-bottom: 6px;
+        }
+        .csv-format-help ul {
+            margin: 6px 0 0 1.25em;
+            padding: 0;
+        }
+        .csv-format-help li {
+            margin-bottom: 4px;
+        }
+        body.dark-mode .csv-format-help summary {
+            color: var(--accent-hover);
+        }
+        body.high-contrast .csv-format-help summary {
+            color: #ffff00;
+        }
 </style>
 </head>
 <body>
@@ -2329,6 +2354,7 @@
         <!-- Email verification banner (shown while the signed-in user's email is unverified) -->
         <section id="verify-email-banner" class="verify-banner hidden" aria-labelledby="verify-email-heading">
             <h2 id="verify-email-heading">Please verify your email address</h2>
+            <p><strong>Your account is device-only until you verify.</strong> Your decks are saved on this device only. They are not backed up, and they won't appear on your other devices. Signing out keeps them safe on this device. As soon as you verify, they are backed up automatically, and anything already saved in your account is kept.</p>
             <p>To confirm your account, open the verification email sent to <strong id="verify-email-address"></strong> and select the link inside. You can keep using SparkDeck while you wait. The email comes from noreply@sparkdeck-8d613.firebaseapp.com, so if it doesn't show up within a few minutes, check your spam or junk folder, or select Resend verification email.</p>
             <div class="verify-banner-actions">
                 <button type="button" id="verify-check-btn">I've verified my email</button>
@@ -2336,6 +2362,7 @@
             </div>
             <p id="verify-email-status" class="verify-status" role="status" aria-live="polite"></p>
         </section>
+        <p id="cloud-sync-status" class="inline-status cloud-sync-status" role="status" aria-live="polite"></p>
 
         <nav class="nav-tabs" role="tablist">
             <button class="nav-tab active" role="tab" data-tab="decks" aria-selected="true">My Decks</button>
@@ -2591,9 +2618,21 @@ Mitochondria are the powerhouses of the cell."></textarea>
                 <div class="settings-section">
                     <h3>Data Management</h3>
                     <p class="setting-description">Import decks from a file, or download a copy of all your decks and folders.</p>
+                    <p id="import-help" class="setting-help">Import Data accepts a SparkDeck backup file (.json) or a spreadsheet saved as CSV (.csv). Imported decks are added alongside your existing ones.</p>
+                    <details class="csv-format-help">
+                        <summary>How to set up a CSV spreadsheet for import</summary>
+                        <ul class="setting-help">
+                            <li>The first row names the columns. <strong>Front</strong> and <strong>Back</strong> are required. You can also use Question and Answer, or Term and Definition.</li>
+                            <li>Optional columns: <strong>Deck</strong> (cards with the same deck name go into one deck), <strong>Category</strong>, <strong>Folder</strong> (use a slash for folders inside folders, like Science / Biology), and <strong>Link</strong> (a video or web link).</li>
+                            <li>Each row after the first is one card. Rows without both a front and a back are skipped, and you're told which rows.</li>
+                            <li>If there is no Deck column, the cards go into a deck named after the file.</li>
+                            <li>A file downloaded with Download Spreadsheet (CSV) is already in this format, so you can edit it in Excel or Google Sheets and import it again. It comes back as new decks, and decks whose name is already used get "(imported)" added.</li>
+                        </ul>
+                    </details>
                     <div class="button-group">
-                        <button id="import-btn" type="button">Import Data</button>
+                        <button id="import-btn" type="button" aria-describedby="import-help">Import Data</button>
                     </div>
+                    <p id="import-status" class="inline-status" role="status" aria-live="polite"></p>
                     <h4 class="export-heading">Export all data</h4>
                     <ul class="setting-help export-help">
                         <li><strong>Backup file:</strong> the best choice for keeping a copy or moving to another device. You can load it back with Import Data.</li>
@@ -2724,7 +2763,7 @@ Mitochondria are the powerhouses of the cell."></textarea>
                 <h3>The deck actions menu (⋮)</h3>
                 <ul>
                     <li><strong>Edit Cards:</strong> add, change, or remove cards in the deck.</li>
-                    <li><strong>Export:</strong> download the deck as a file you can share or import later.</li>
+                    <li><strong>Export:</strong> download just this deck as a backup file, a spreadsheet (CSV), or a plain text file.</li>
                     <li><strong>Move to Folder:</strong> put the deck in a different folder.</li>
                     <li><strong>Enable or Disable Shuffle:</strong> choose whether cards appear in random order or in the order you wrote them.</li>
                     <li><strong>Delete:</strong> remove the deck. You will be asked to confirm first.</li>
@@ -2773,12 +2812,12 @@ Mitochondria are the powerhouses of the cell."></textarea>
                     <li><strong>Reduced Motion:</strong> turns off animations and sliding or fading effects, for people who find on-screen motion uncomfortable.</li>
                     <li><strong>Sound Effects:</strong> turn the flip, quiz, and study sounds on or off.</li>
                     <li><strong>Stats Tab:</strong> show or hide the Stats tab, or reset your stats.</li>
-                    <li><strong>Import Data:</strong> load decks from a SparkDeck backup or deck file.</li>
-                    <li><strong>Export:</strong> download a full backup (to import later), a spreadsheet file (CSV) that opens in Excel or Google Sheets, or a plain text file that is easy to read or print.</li>
+                    <li><strong>Import Data:</strong> load decks from a SparkDeck backup file, or from a spreadsheet saved as CSV. A CSV needs a first row naming the columns: Front and Back are required, and Deck, Category, Folder, and Link are optional. Each row after that is one card. Settings has a short guide with more detail.</li>
+                    <li><strong>Export:</strong> download all your decks as a backup file (to import later), a spreadsheet file (CSV) that opens in Excel or Google Sheets, or a plain text file that is easy to read or print. Each deck's actions menu (⋮) has the same three choices for just that deck.</li>
                 </ul>
 
                 <h2>Your account</h2>
-                <p>After you sign up, we email you a verification link. Until you open it, a reminder appears at the top of the app. You can keep studying in the meantime, resend the email, or select "I've verified my email" once you have clicked the link.</p>
+                <p>After you sign up, we email you a verification link. Until you open it, a reminder appears at the top of the app, and your account is device-only: your decks are saved on this device, but not backed up or shared with your other devices. You can keep studying in the meantime, resend the email, or select "I've verified my email" once you have clicked the link. Cloud backup then turns on, and the decks on this device are combined with anything already in your account, without deleting either.</p>
 
                 <h2>Keyboard shortcuts</h2>
                 <p>These work anywhere in the app, as long as you are not typing in a text field.</p>

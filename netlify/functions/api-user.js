@@ -8,7 +8,7 @@
 //   Returns: { user: { id, firebase_uid, email, created_at } }
 
 const { query } = require("./utils/db");
-const { authenticateRequest } = require("./utils/auth");
+const { authenticateRequest, emailNotVerifiedResponse } = require("./utils/auth");
 
 exports.handler = async function (event) {
     // Only allow POST
@@ -30,7 +30,12 @@ exports.handler = async function (event) {
         };
     }
 
-    const { uid, email } = authResult.user;
+    const { uid, email, emailVerified } = authResult.user;
+
+    // Unverified accounts get no database row until they verify their email.
+    if (!emailVerified) {
+        return emailNotVerifiedResponse();
+    }
 
     try {
         // Find or create the user

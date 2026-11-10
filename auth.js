@@ -42,6 +42,7 @@
     const verifyCheckBtn = document.getElementById('verify-check-btn');
     const verifyResendBtn = document.getElementById('verify-resend-btn');
     const verifyStatus = document.getElementById('verify-email-status');
+    const cloudSyncStatus = document.getElementById('cloud-sync-status');
 
     // Password rule checklist (signup form)
     const passwordRuleList = document.getElementById('password-requirements');
@@ -155,92 +156,248 @@
         }
     }
 
-    // ---- Database Sync ----
-    // After login, sync user data between localStorage and the Neon database.
-    // The database is the source of truth for cross-device persistence.
-    // localStorage acts as a fast cache for the current session.
+    // ---- Per-account data on this device ----
+    // The app keeps the signed-in person's decks, folders, settings, and stats
+    // in four localStorage keys. OWNER_KEY records whose data that is. When a
+    // different person signs in on this device, the previous person's data is
+    // moved into their own "vault" key and the new person's vault (if any) is
+    // restored. Nothing is deleted, so device-only decks survive sign-out and
+    // someone else signing in on the same device.
 
-    async function syncWithDatabase(firebaseUser) {
+    var LOCAL_KEYS = ['sparkdeck-decks', 'sparkdeck-folders', 'sparkdeck-settings', 'sparkdeck-stats'];
+    var OWNER_KEY = 'sparkdeck-local-owner';
+
+    function vaultKey(uid) { return 'sparkdeck-vault-' + uid; }
+
+    // Returns true if the working data was swapped for a different person's.
+    function useLocalDataFor(uid) {
         try {
-            var token = await firebaseUser.getIdToken();
+            var owner = localStorage.getItem(OWNER_KEY);
+            if (owner === uid) return false;
+            if (!owner) {
+                // Data saved before this feature existed: it belongs to whoever
+                // signs in first, which matches how the app always behaved.
+                localStorage.setItem(OWNER_KEY, uid);
+                return false;
+            }
 
-            // Step 1: Ensure user record exists in the database
-            var userResponse = await fetch('/.netlify/functions/api-user', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + token }
+            // 1. Save the previous person's data. If this fails (storage full),
+            //    we stop here and touch nothing else.
+            var snapshot = {};
+            LOCAL_KEYS.forEach(function (k) { snapshot[k] = localStorage.getItem(k); });
+            localStorage.setItem(vaultKey(owner), JSON.stringify(snapshot));
+
+            // 2. Bring back this person's data, or start with an empty deck list.
+            //    Display settings carry over if they have none saved yet.
+            var saved = localStorage.getItem(vaultKey(uid));
+            var restore = saved ? JSON.parse(saved) : {};
+            LOCAL_KEYS.forEach(function (k) {
+                if (!saved && k === 'sparkdeck-settings') return;
+                if (restore[k] !== null && restore[k] !== undefined) localStorage.setItem(k, restore[k]);
+                else localStorage.removeItem(k);
             });
-
-            if (!userResponse.ok) {
-                console.warn('Could not register user in database:', userResponse.status);
-                return;
-            }
-
-            // Step 2: Load user data from the database
-            var dataResponse = await fetch('/.netlify/functions/api-data', {
-                method: 'GET',
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-
-            if (!dataResponse.ok) {
-                var errorBody = await dataResponse.json().catch(function() { return {}; });
-                console.warn('Could not load data from database:', dataResponse.status, JSON.stringify(errorBody));
-                return;
-            }
-
-            var cloudData = await dataResponse.json();
-
-            // Step 3: Decide which direction to sync
-            var hasCloudDecks = cloudData.decks && cloudData.decks.length > 0;
-            var hasCloudFolders = cloudData.folders && cloudData.folders.length > 0;
-            var hasCloudData = hasCloudDecks || hasCloudFolders;
-
-            if (hasCloudData) {
-                // Database has data — load it into the app
-                if (window.app && window.app.loadFromCloud) {
-                    window.app.loadFromCloud(cloudData);
-                }
-                announce('Data synced from cloud.');
-            } else {
-                // Database is empty — upload current localStorage data
-                var hasLocalDecks = window.app && window.app.decks && window.app.decks.length > 0;
-                var hasLocalFolders = window.app && window.app.folders && window.app.folders.length > 0;
-
-                if (hasLocalDecks || hasLocalFolders) {
-                    await uploadToDatabase(token);
-                    announce('Data backed up to cloud.');
-                }
-            }
-
-            // Store the token getter so app.js can use it for saves
-            if (window.app) {
-                window.app._getAuthToken = function () {
-                    return firebaseUser.getIdToken();
-                };
-            }
+            if (saved) localStorage.removeItem(vaultKey(uid));
+            localStorage.setItem(OWNER_KEY, uid);
+            return true;
         } catch (error) {
-            // Sync failure is non-fatal — app works with localStorage
-            console.warn('Database sync failed (app still works locally):', error);
+            console.warn('Could not switch local data to the signed-in account:', error);
+            return false;
         }
     }
 
-    async function uploadToDatabase(token) {
-        if (!window.app) return;
+    // "Device-only pending" marks an account that has used this device while
+    // unverified. The first cloud sync after verification then merges instead
+    // of replacing, so neither the local decks nor the cloud decks are lost.
+    function pendingKey(uid) { return 'sparkdeck-device-only-' + uid; }
+    function markDeviceOnly(uid) { try { localStorage.setItem(pendingKey(uid), new Date().toISOString()); } catch (_) {} }
+    function isDeviceOnlyPending(uid) { try { return !!localStorage.getItem(pendingKey(uid)); } catch (_) { return false; } }
+    function clearDeviceOnly(uid) { try { localStorage.removeItem(pendingKey(uid)); } catch (_) {} }
 
-        var data = {
-            decks: window.app.decks || [],
-            folders: window.app.folders || [],
-            settings: window.app.settings || {},
-            stats: window.app.stats || { studySessions: [] }
-        };
+    function setCloudStatus(message, type) {
+        if (!cloudSyncStatus) return;
+        cloudSyncStatus.classList.remove('is-error', 'is-success');
+        if (type) cloudSyncStatus.classList.add('is-' + type);
+        cloudSyncStatus.textContent = message || '';
+    }
 
-        await fetch('/.netlify/functions/api-data', {
-            method: 'PUT',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
+    function isStillSignedInAs(uid) {
+        return !!(auth.currentUser && auth.currentUser.uid === uid);
+    }
+
+    function enterDeviceOnly(user) {
+        markDeviceOnly(user.uid);
+        if (window.app) {
+            window.app._getAuthToken = null;
+            window.app.cancelPendingCloudSync();
+        }
+    }
+
+    // Call a Netlify Function. If the server says the email isn't verified,
+    // refresh the ID token once (it may have been issued before verifying)
+    // and try again. Returns the fetch Response, or { notVerified: true }.
+    async function callApi(user, path, method, forceFreshToken) {
+        var token = await user.getIdToken(!!forceFreshToken);
+        var response = await fetch('/.netlify/functions/' + path, {
+            method: method,
+            headers: { 'Authorization': 'Bearer ' + token }
         });
+        if (response.status === 403) {
+            var body = await response.clone().json().catch(function () { return {}; });
+            if (body && body.code === 'email_not_verified') {
+                if (!forceFreshToken) return callApi(user, path, method, true);
+                return { notVerified: true };
+            }
+        }
+        return response;
+    }
+
+    // ---- Database Sync ----
+    // After sign-in (or right after verifying), connect this device to the
+    // cloud. Unverified accounts stay device-only and never touch the server's
+    // database. Returns a short result string for messages.
+
+    var syncPromise = null;
+    var syncPromiseUid = null;
+
+    function syncWithDatabase(firebaseUser) {
+        if (syncPromise && syncPromiseUid === firebaseUser.uid) return syncPromise;
+        syncPromiseUid = firebaseUser.uid;
+        syncPromise = doSyncWithDatabase(firebaseUser).finally(function () {
+            syncPromise = null;
+            syncPromiseUid = null;
+        });
+        return syncPromise;
+    }
+
+    async function doSyncWithDatabase(firebaseUser) {
+        var app = window.app;
+        if (!app) return 'error';
+        var uid = firebaseUser.uid;
+
+        // No cloud saves until this function decides it's safe.
+        app._getAuthToken = null;
+
+        try {
+            // They may have clicked the link in another tab or on another device.
+            if (!firebaseUser.emailVerified) {
+                try { await firebaseUser.reload(); } catch (_) {}
+                if (!isStillSignedInAs(uid)) return 'cancelled';
+                firebaseUser = auth.currentUser;
+            }
+
+            if (!firebaseUser.emailVerified) {
+                enterDeviceOnly(firebaseUser);
+                return 'device-only';
+            }
+
+            // Step 1: Make sure the account has a database row.
+            var mergeNeeded = isDeviceOnlyPending(uid);
+            var userResponse = await callApi(firebaseUser, 'api-user', 'POST', mergeNeeded);
+            if (userResponse.notVerified) { enterDeviceOnly(firebaseUser); return 'device-only'; }
+            if (!userResponse.ok) {
+                console.warn('Could not register user in database:', userResponse.status);
+                return 'error';
+            }
+
+            // Step 2: Load what's already in the cloud.
+            var dataResponse = await callApi(firebaseUser, 'api-data', 'GET', false);
+            if (dataResponse.notVerified) { enterDeviceOnly(firebaseUser); return 'device-only'; }
+            if (!dataResponse.ok) {
+                var errorBody = await dataResponse.json().catch(function () { return {}; });
+                console.warn('Could not load data from database:', dataResponse.status, JSON.stringify(errorBody));
+                return 'error';
+            }
+            var cloudData = await dataResponse.json();
+            if (!isStillSignedInAs(uid)) return 'cancelled';
+
+            var hasCloudData =
+                (Array.isArray(cloudData.decks) && cloudData.decks.length > 0) ||
+                (Array.isArray(cloudData.folders) && cloudData.folders.length > 0) ||
+                (cloudData.stats && Array.isArray(cloudData.stats.studySessions) && cloudData.stats.studySessions.length > 0);
+            var hasLocalData = (app.decks && app.decks.length > 0) || (app.folders && app.folders.length > 0);
+
+            var tokenGetter = function () { return firebaseUser.getIdToken(); };
+
+            // Step 3a: First sync after a device-only period. Merge, never replace.
+            if (mergeNeeded) {
+                if (!hasCloudData) {
+                    app._getAuthToken = tokenGetter;
+                    var uploaded = hasLocalData ? await app._doCloudSync() : true;
+                    if (uploaded) clearDeviceOnly(uid);
+                    return uploaded ? (hasLocalData ? 'uploaded' : 'synced') : 'error';
+                }
+
+                // Merge using the app's data as it is right now, so edits made
+                // while the cloud data was loading are included.
+                var result = app.mergeLocalIntoCloud(cloudData, {
+                    decks: app.decks, folders: app.folders, settings: app.settings, stats: app.stats
+                });
+                if (result.data.decks.length > 500 || result.data.folders.length > 200) {
+                    // Too big to save in one go. Leave everything as it is on
+                    // both sides and keep this device in merge mode.
+                    console.warn('Merged data exceeds cloud limits; merge postponed.');
+                    return 'too-large';
+                }
+                app.loadFromCloud(result.data);
+                app._getAuthToken = tokenGetter;
+                var merged = await app._doCloudSync();
+                if (merged) clearDeviceOnly(uid);
+                lastMergeResult = result;
+                return merged ? 'merged' : 'error';
+            }
+
+            // Step 3b: Normal sign-in for a verified account.
+            if (hasCloudData) {
+                app.loadFromCloud(cloudData);
+                app._getAuthToken = tokenGetter;
+                announce('Data synced from cloud.');
+                return 'synced';
+            }
+            app._getAuthToken = tokenGetter;
+            if (hasLocalData) {
+                await app._doCloudSync();
+                announce('Data backed up to cloud.');
+                return 'uploaded';
+            }
+            return 'synced';
+        } catch (error) {
+            // Sync failure is non-fatal — the app keeps working with local data.
+            console.warn('Database sync failed (app still works locally):', error);
+            return 'error';
+        }
+    }
+
+    var lastMergeResult = null;
+
+    // Turn a sync result into a message for people who just verified.
+    function describeSyncResult(result) {
+        switch (result) {
+            case 'uploaded':
+                return { text: 'Cloud sync is on. Your decks are now backed up and will appear on any device where you sign in.', type: 'success' };
+            case 'synced':
+                return { text: 'Cloud sync is on. Your decks will now be backed up and appear on any device where you sign in.', type: 'success' };
+            case 'merged': {
+                var r = lastMergeResult || { addedDecks: 0, keptBoth: 0, addedFolders: 0 };
+                var parts = ['Cloud sync is on. We combined the decks on this device with the ones already in your account, and nothing was deleted.'];
+                if (r.addedDecks || r.addedFolders) {
+                    parts.push('Added from this device: ' + r.addedDecks + ' deck' + (r.addedDecks === 1 ? '' : 's') +
+                        ' and ' + r.addedFolders + ' folder' + (r.addedFolders === 1 ? '' : 's') + '.');
+                }
+                if (r.keptBoth) {
+                    parts.push(r.keptBoth + ' deck' + (r.keptBoth === 1 ? ' was' : 's were') +
+                        ' different on this device than in your account, so we kept both. The copies from this device end with "(from this device)".');
+                }
+                return { text: parts.join(' '), type: 'success' };
+            }
+            case 'too-large':
+                return { text: 'Your email is verified, but this device and your account together have more decks or folders than one account can hold (500 decks, 200 folders). Nothing was changed. Your decks on this device are still saved here.', type: 'error' };
+            case 'device-only':
+                return { text: 'Our server has not seen your verification yet. Please wait a minute, then select "I\'ve verified my email" again.', type: 'error' };
+            case 'error':
+                return { text: 'Your email is verified, but we could not reach the cloud just now. Your decks are safe on this device, and we will try again the next time you sign in.', type: 'error' };
+            default:
+                return null;
+        }
     }
 
     // ---- Form Toggle ----
@@ -438,12 +595,31 @@
                 .then(function () {
                     var refreshed = auth.currentUser;
                     if (refreshed && refreshed.emailVerified) {
-                        // Refresh the ID token so the server sees the verified status too.
-                        refreshed.getIdToken(true).catch(function () {});
-                        updateVerifyBanner(refreshed);
-                        announce('Thank you! Your email address is verified.');
-                        var heading = appContainer.querySelector('h1');
-                        if (heading) heading.focus();
+                        setVerifyStatus('Thank you, your email is verified! Turning on cloud sync…');
+                        // Get a fresh ID token so the server sees the verified status,
+                        // then connect this device's decks to the cloud safely.
+                        return refreshed.getIdToken(true)
+                            .catch(function () {})
+                            .then(function () { return syncWithDatabase(refreshed); })
+                            .then(function (result) {
+                                if (result === 'device-only') {
+                                    var msg = describeSyncResult(result);
+                                    setVerifyStatus(msg.text);
+                                    return;
+                                }
+                                updateVerifyBanner(refreshed);
+                                var info = describeSyncResult(result);
+                                if (info) setCloudStatus(info.text, info.type);
+                                // Focus the message so screen readers read it and
+                                // keyboard focus isn't lost when the banner hides.
+                                if (cloudSyncStatus && info) {
+                                    cloudSyncStatus.setAttribute('tabindex', '-1');
+                                    cloudSyncStatus.focus();
+                                } else {
+                                    var heading = appContainer.querySelector('h1');
+                                    if (heading) heading.focus();
+                                }
+                            });
                     } else {
                         setVerifyStatus('Your email is not verified yet. Open the link in the email we sent, then try this button again.');
                     }
@@ -459,7 +635,11 @@
 
     // ---- Sign Out ----
 
-    signOutBtn.addEventListener('click', function () {
+    signOutBtn.addEventListener('click', async function () {
+        // Send any last change that is still waiting to sync.
+        if (window.app && window.app.flushCloudSync) {
+            try { await window.app.flushCloudSync(); } catch (_) {}
+        }
         auth.signOut()
             .then(function () {
                 announce('Signed out successfully.');
@@ -485,16 +665,37 @@
                 userEmailDisplay.textContent = user.email;
             }
 
-            updateVerifyBanner(user);
-            autoSendVerificationOnce(user);
+            // Make sure the decks on screen belong to this account.
+            var swapped = useLocalDataFor(user.uid);
 
             // Initialize SparkDeckApp if it hasn't been created yet
             if (!window.app) {
                 window.app = new SparkDeckApp();
+            } else if (swapped) {
+                window.app.reloadFromLocal();
             }
+            window.app.onCloudSyncBlocked = function () {
+                if (auth.currentUser) markDeviceOnly(auth.currentUser.uid);
+            };
 
-            // Sync data with the database (async, doesn't block the UI)
-            syncWithDatabase(user);
+            setCloudStatus('');
+            updateVerifyBanner(user);
+            autoSendVerificationOnce(user);
+
+            // Sync data with the database (async, doesn't block the UI).
+            // If they verified somewhere else, this notices and turns sync on.
+            var wasUnverified = !user.emailVerified;
+            syncWithDatabase(user).then(function (result) {
+                if (!isStillSignedInAs(user.uid)) return;
+                updateVerifyBanner(auth.currentUser);
+                if (wasUnverified && auth.currentUser.emailVerified) {
+                    var info = describeSyncResult(result);
+                    if (info) setCloudStatus(info.text, info.type);
+                } else if (result === 'merged' || result === 'too-large') {
+                    var info2 = describeSyncResult(result);
+                    if (info2) setCloudStatus(info2.text, info2.type);
+                }
+            });
 
             // Move focus to the main app heading
             var heading = appContainer.querySelector('h1');
@@ -512,10 +713,13 @@
                 userEmailDisplay.textContent = '';
             }
 
-            // Clear the token getter
+            // Clear the token getter and drop any save that hadn't been sent,
+            // so nothing from this account can be sent with someone else's sign-in.
             if (window.app) {
                 window.app._getAuthToken = null;
+                window.app.cancelPendingCloudSync();
             }
+            setCloudStatus('');
 
             // Move focus to the auth screen heading
             var authHeading = authScreen.querySelector('h1');

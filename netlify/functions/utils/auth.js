@@ -138,6 +138,9 @@ async function verifyToken(idToken) {
     return {
         uid: payload.sub,
         email: payload.email || null,
+        // Firebase sets this claim from the account's real verification state.
+        // It is part of the signed token, so the client cannot fake it.
+        emailVerified: payload.email_verified === true,
     };
 }
 
@@ -177,4 +180,18 @@ async function authenticateRequest(event) {
     }
 }
 
-module.exports = { verifyToken, extractToken, authenticateRequest };
+// Standard response for accounts whose email address is not verified yet.
+// Unverified accounts are device-only: no database row, no cloud reads or writes.
+// The client looks for code "email_not_verified" to tell this apart from other errors.
+function emailNotVerifiedResponse() {
+    return {
+        statusCode: 403,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            error: "Please verify your email address to turn on cloud sync.",
+            code: "email_not_verified",
+        }),
+    };
+}
+
+module.exports = { verifyToken, extractToken, authenticateRequest, emailNotVerifiedResponse };

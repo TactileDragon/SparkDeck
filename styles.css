@@ -2181,3 +2181,28 @@ body.dark-mode .verify-banner .secondary-btn:focus {
     background: #4a3d10;
     color: #ffffff;
 }
+.cloud-sync-status {
+    margin: 0 0 24px;
+}
+.csv-format-help {
+    margin: 0 0 12px;
+}
+.csv-format-help summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #1f5f99;
+    margin-bottom: 6px;
+}
+.csv-format-help ul {
+    margin: 6px 0 0 1.25em;
+    padding: 0;
+}
+.csv-format-help li {
+    margin-bottom: 4px;
+}
+body.dark-mode .csv-format-help summary {
+    color: var(--accent-hover);
+}
+body.high-contrast .csv-format-help summary {
+    color: #ffff00;
+}
