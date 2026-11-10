@@ -306,15 +306,10 @@
         setLoading(signupSubmitBtn, true);
 
         auth.createUserWithEmailAndPassword(email, password)
-            .then(function (credential) {
-                announce('Account created! We sent a verification link to your email.');
-                // Send the verification email. Failure here is non-fatal:
-                // the banner offers a "Resend" button.
-                if (credential && credential.user) {
-                    return credential.user.sendEmailVerification().catch(function (err) {
-                        console.warn('Could not send verification email:', err);
-                    });
-                }
+            .then(function () {
+                // The verification email is sent by the auth observer below,
+                // which handles new and existing accounts the same way.
+                announce('Account created! Welcome to SparkDeck.');
             })
             .catch(function (error) {
                 showError(getFriendlyError(error.code));
@@ -370,6 +365,34 @@
 
     function setVerifyStatus(message) {
         if (verifyStatus) verifyStatus.textContent = message;
+    }
+
+    // Send the verification email automatically once per account on this
+    // device. This covers brand-new signups and accounts created before
+    // verification existed. After that, the Resend button is the way to
+    // get another, so we never spam people on every sign-in.
+    function autoSendVerificationOnce(user) {
+        if (!user || user.emailVerified) return;
+        var key = 'sparkdeck-verify-sent-' + user.uid;
+        try {
+            if (localStorage.getItem(key)) return;
+            localStorage.setItem(key, new Date().toISOString());
+        } catch (_) {
+            // Storage blocked: still send, the Resend button covers the rest.
+        }
+        user.sendEmailVerification()
+            .then(function () {
+                setVerifyStatus('We just sent a verification email to ' + user.email + '. It can take a few minutes to arrive.');
+            })
+            .catch(function (error) {
+                console.warn('Could not send verification email:', error);
+                try { localStorage.removeItem(key); } catch (_) {}
+                if (error && error.code === 'auth/too-many-requests') {
+                    setVerifyStatus('We could not send a verification email just now because too many were requested. Please wait a few minutes, then select Resend verification email.');
+                } else {
+                    setVerifyStatus('We could not send a verification email just now. Please select Resend verification email to try again.');
+                }
+            });
     }
 
     function updateVerifyBanner(user) {
@@ -463,6 +486,7 @@
             }
 
             updateVerifyBanner(user);
+            autoSendVerificationOnce(user);
 
             // Initialize SparkDeckApp if it hasn't been created yet
             if (!window.app) {

@@ -325,7 +325,7 @@ class SparkDeckApp {
 - Login and signup with client-side validation
   - Email must look like `name@domain.tld` (`EMAIL_PATTERN` in auth.js), so `abc@a` is rejected
   - Signup password rules: 8 to 64 characters, uppercase, lowercase, number, and one of `!@#$%^&*()-_=+[]{};:,.?/~`. A live checklist under the field shows each rule as "done" or "not met yet". Login does not re-check the rules, so older accounts with weaker passwords still sign in
-- Email verification: a verification email is sent right after signup. Unverified users are NOT locked out; a banner (`#verify-email-banner`) asks them to verify, with "I've verified my email" (reloads the Firebase user) and "Resend verification email" buttons
+- Email verification: when an unverified user signs in, a verification email is sent automatically once per account per device (localStorage key `sparkdeck-verify-sent-<uid>`). This covers new signups and accounts created before verification existed. Unverified users are NOT locked out; a banner (`#verify-email-banner`) asks them to verify, with "I've verified my email" (reloads the Firebase user) and "Resend verification email" buttons
 - Auth state observer controls app visibility
 - Token-based API authentication
 - Smart sync: cloud data preferred, local data uploaded if cloud is empty
