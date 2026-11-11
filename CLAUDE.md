@@ -323,6 +323,13 @@ class SparkDeckApp {
 ### 1. Authentication (auth.js)
 - Firebase email/password authentication
 - Login and signup with client-side validation
+  - Email must look like `name@domain.tld` (`EMAIL_PATTERN` in auth.js), so `abc@a` is rejected
+  - Signup password rules: 8 to 64 characters, uppercase, lowercase, number, and one of `!@#$%^&*()-_=+[]{};:,.?/~`. A live checklist under the field shows each rule as "done" or "not met yet". Login does not re-check the rules, so older accounts with weaker passwords still sign in
+- Email verification: when an unverified user signs in, a verification email is sent automatically once per account per device (localStorage key `sparkdeck-verify-sent-<uid>`). This covers new signups and accounts created before verification existed. Unverified users are NOT locked out; a banner (`#verify-email-banner`) asks them to verify, with "I've verified my email" (reloads the Firebase user) and "Resend verification email" buttons
+- **Device-only until verified**: unverified accounts never touch the database. `api-user` and `api-data` return 403 `{ code: "email_not_verified" }` before any query, based on the signed `email_verified` token claim (`emailVerified` from `utils/auth.js`). The banner explains that decks are saved on this device only
+- **Per-account local data**: the four `sparkdeck-*` data keys belong to the account in `sparkdeck-local-owner`. When a different account signs in on the same device, `useLocalDataFor()` in auth.js moves the previous owner's data to `sparkdeck-vault-<uid>` and restores the new account's vault. Nothing is deleted
+- **Safe first sync after verifying**: `sparkdeck-device-only-<uid>` marks an account that used this device while unverified. Its first verified sync calls `app.mergeLocalIntoCloud()` instead of replacing: every cloud deck, folder, and study session is kept; local-only decks and folders are added (matched by name and folder path, since folder IDs change on every server save); a deck that differs on both sides is kept twice, the local copy named "(from this device)". The flag clears only after the PUT succeeds
+- `_getAuthToken` (cloud saves) is only set once `syncWithDatabase()` has finished loading or merging, so a stray save can never overwrite cloud data with an incomplete local copy
 - Auth state observer controls app visibility
 - Token-based API authentication
 - Smart sync: cloud data preferred, local data uploaded if cloud is empty
@@ -409,9 +416,10 @@ Sophisticated exam-like quiz system with three modes:
 - Mute toggle persisted to localStorage
 
 ### 11. Import/Export (app.js:3264-3567)
-- **Single Deck Export**: Download individual deck as JSON
-- **Full Backup Export**: All decks + folders as JSON
-- **Import**: File picker with format detection
+- **Single Deck Export**: deck ⋮ menu offers JSON backup, CSV spreadsheet, or plain text
+- **Full Export** (Settings): all decks as JSON backup, CSV, or plain text
+- **CSV format** (`_buildCSV` / `_importCSV`): header row `Folder, Deck, Category, Card Number, Front, Back, Link`, one card per row. Import needs Front and Back (or Question/Answer, Term/Definition); Deck, Category, Folder (`A / B` for nested), Link are optional; other columns ignored. Comma, semicolon, or tab separators; quoted cells; BOM. Headerless two-column files are read as front/back and the confirm dialog says so. Imports always add new decks (name clashes get "(imported)"); never replace. Limits: 5 MB, 10,000 rows, 500 decks, 200 folders. Export prefixes formula-like cells with `'`, and import strips it again
+- **Import**: File picker accepts .json and .csv, results shown in `#import-status` and announced
   - Single deck import with merge/replace option
   - Full backup import with folder ID remapping
 - **Security**: HTML stripping, card data sanitization, field truncation

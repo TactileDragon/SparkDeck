@@ -166,6 +166,7 @@ class SparkDeckApp {
         this.manualInput = document.getElementById('manual-input');
         this.notesInput = document.getElementById('notes-input');
         this.generateBtn = document.getElementById('generate-btn');
+        this.generateStatus = document.getElementById('generate-status');
         this.cardFront = document.getElementById('card-front');
         this.cardBack = document.getElementById('card-back');
         this.cardMediaInput = document.getElementById('card-media');
@@ -184,6 +185,7 @@ class SparkDeckApp {
         this.progressFill = document.getElementById('progress-fill');
         this.flashcard = document.getElementById('flashcard');
         this.cardContent = document.getElementById('card-content');
+        this.cardMediaArea = document.getElementById('card-media-area');
         this.prevBtn = document.getElementById('prev-btn');
         this.flipBtn = document.getElementById('flip-btn');
         this.nextBtn = document.getElementById('next-btn');
@@ -231,7 +233,7 @@ class SparkDeckApp {
 
         // Vision settings elements
         this.darkModeBtn = document.getElementById('dark-mode-btn');
-        this.fontSizeBtn = document.getElementById('font-size-btn');
+        this.fontSizeGroup = document.getElementById('font-size-group');
         this.highContrastBtn = document.getElementById('high-contrast-btn');
         this.reducedMotionBtn = document.getElementById('reduced-motion-btn');
 
@@ -271,6 +273,8 @@ class SparkDeckApp {
         // Import/Export buttons (Settings)
         this.importBtn = document.getElementById('import-btn');
         this.exportAllBtn = document.getElementById('export-all-btn');
+        this.exportCsvBtn = document.getElementById('export-csv-btn');
+        this.exportTextBtn = document.getElementById('export-text-btn');
     }
 
     setupEventListeners() {
@@ -448,8 +452,12 @@ class SparkDeckApp {
         if (this.darkModeBtn) {
             this.darkModeBtn.addEventListener('click', () => this.toggleDarkMode());
         }
-        if (this.fontSizeBtn) {
-            this.fontSizeBtn.addEventListener('click', () => this.cycleFontSize());
+        if (this.fontSizeGroup) {
+            this.fontSizeGroup.addEventListener('change', (e) => {
+                if (e.target && e.target.name === 'font-size') {
+                    this.setFontSize(e.target.value);
+                }
+            });
         }
         if (this.highContrastBtn) {
             this.highContrastBtn.addEventListener('click', () => this.toggleHighContrast());
@@ -496,6 +504,12 @@ class SparkDeckApp {
         // Import/Export buttons (Settings)
         if (this.exportAllBtn) {
             this.exportAllBtn.addEventListener('click', () => this.exportAllData());
+        }
+        if (this.exportCsvBtn) {
+            this.exportCsvBtn.addEventListener('click', () => this.exportAllAsCSV());
+        }
+        if (this.exportTextBtn) {
+            this.exportTextBtn.addEventListener('click', () => this.exportAllAsText());
         }
         if (this.importBtn) {
             this.importBtn.addEventListener('click', () => this.triggerImport());
@@ -854,11 +868,10 @@ class SparkDeckApp {
         this.darkModeBtn.setAttribute('aria-label', isOn ? 'Dark mode enabled. Click to disable.' : 'Dark mode disabled. Click to enable.');
     }
 
-    cycleFontSize() {
+    setFontSize(size) {
         const sizes = ['small', 'medium', 'large', 'extra-large'];
-        const currentIndex = sizes.indexOf(this.settings.fontSize);
-        const nextIndex = (currentIndex + 1) % sizes.length;
-        this.settings.fontSize = sizes[nextIndex];
+        if (!sizes.includes(size) || size === this.settings.fontSize) return;
+        this.settings.fontSize = size;
         this.saveSettings();
         this.applyFontSize();
         this.updateFontSizeButton();
@@ -874,11 +887,11 @@ class SparkDeckApp {
     }
 
     updateFontSizeButton() {
-        if (!this.fontSizeBtn) return;
-        const sizeLabels = { 'small': 'Small', 'medium': 'Medium', 'large': 'Large', 'extra-large': 'Extra Large' };
-        const label = sizeLabels[this.settings.fontSize] || 'Medium';
-        this.fontSizeBtn.textContent = label;
-        this.fontSizeBtn.setAttribute('aria-label', `Font size: ${label}. Click to change.`);
+        if (!this.fontSizeGroup) return;
+        const current = this.settings.fontSize || 'medium';
+        this.fontSizeGroup.querySelectorAll('input[name="font-size"]').forEach(radio => {
+            radio.checked = radio.value === current;
+        });
     }
 
     toggleHighContrast() {
@@ -1029,9 +1042,12 @@ class SparkDeckApp {
         }, 2000);
     }
 
+    // Returns true when the cloud save succeeded, false otherwise.
     async _doCloudSync() {
+        const getToken = this._getAuthToken;
+        if (!getToken) return false;
         try {
-            const token = await this._getAuthToken();
+            const token = await getToken();
 
             const data = {
                 decks: this.decks || [],
@@ -1049,13 +1065,175 @@ class SparkDeckApp {
                 body: JSON.stringify(data)
             });
 
+            if (response.status === 403) {
+                const body = await response.json().catch(() => ({}));
+                if (body && body.code === 'email_not_verified') {
+                    // The server says this account is device-only. Stop trying,
+                    // and let auth.js update the banner.
+                    this._getAuthToken = null;
+                    if (typeof this.onCloudSyncBlocked === 'function') this.onCloudSyncBlocked();
+                    return false;
+                }
+            }
+
             if (!response.ok) {
                 console.warn('Cloud sync failed:', response.status);
+                return false;
             }
+            return true;
         } catch (error) {
             // Non-fatal — localStorage still has the data
             console.warn('Cloud sync error (data saved locally):', error);
+            return false;
         }
+    }
+
+    // Send any change still waiting in the 2-second debounce right away.
+    // Used before signing out so the last edit isn't left behind.
+    async flushCloudSync() {
+        if (!this._syncTimeout) return;
+        clearTimeout(this._syncTimeout);
+        this._syncTimeout = null;
+        await this._doCloudSync();
+    }
+
+    // Drop any pending cloud save without sending it (e.g. after sign-out).
+    cancelPendingCloudSync() {
+        if (this._syncTimeout) clearTimeout(this._syncTimeout);
+        this._syncTimeout = null;
+    }
+
+    // Re-read everything from localStorage. Used when a different person
+    // signs in on this device and auth.js has swapped their data in.
+    reloadFromLocal() {
+        if (this.currentDeck) this.endStudy();
+        if (this.quizMode) this.endQuiz();
+        this.cancelPendingCloudSync();
+        this.decks = this.loadDecks();
+        this.folders = this.loadFolders();
+        this.settings = this.loadSettings();
+        this.stats = this.loadStats();
+        this.currentFolderId = null;
+        this.applySettings();
+        this.populateFolderOptions(this.deckFolder);
+        this.renderDecks();
+        this.renderStats();
+    }
+
+    // Combine this device's data with what is already in the cloud, without
+    // overwriting or deleting anything from either side. Used the first time
+    // an account syncs after a device-only (unverified) period.
+    //   - Every cloud folder, deck, and study session is kept as-is.
+    //   - Local folders and decks that the cloud doesn't have are added.
+    //     They are matched by name and folder location, because folder IDs
+    //     change every time the server saves.
+    //   - If a deck exists in both places with different cards, both are kept;
+    //     the local one gets "(from this device)" added to its name.
+    //   - Cloud settings are kept.
+    // Returns { data, addedDecks, keptBoth, addedFolders }.
+    mergeLocalIntoCloud(cloud, local) {
+        const cloudFolders = Array.isArray(cloud.folders) ? cloud.folders.map(f => ({ ...f })) : [];
+        const cloudDecks = Array.isArray(cloud.decks) ? cloud.decks.map(d => ({ ...d })) : [];
+        const localFolders = Array.isArray(local.folders) ? local.folders : [];
+        const localDecks = Array.isArray(local.decks) ? local.decks : [];
+
+        const pathOf = (folders, id) => {
+            const names = [];
+            const seen = new Set();
+            let cur = id ? folders.find(f => f.id === id) : null;
+            while (cur && !seen.has(cur.id)) {
+                seen.add(cur.id);
+                names.unshift(String(cur.name).trim().toLowerCase());
+                cur = cur.parentFolderId ? folders.find(f => f.id === cur.parentFolderId) : null;
+            }
+            return names.join('/');
+        };
+
+        // Folder path -> id in the merged result ('' is the top level).
+        const folderIdByPath = new Map([['', null]]);
+        cloudFolders.forEach(f => folderIdByPath.set(pathOf(cloudFolders, f.id), f.id));
+
+        // Add local folders the cloud lacks, parents first (shorter paths first).
+        let addedFolders = 0;
+        const localWithPaths = localFolders
+            .map(f => ({ f, path: pathOf(localFolders, f.id) }))
+            .sort((a, b) => a.path.split('/').length - b.path.split('/').length);
+        localWithPaths.forEach(({ f, path }) => {
+            if (!path || folderIdByPath.has(path)) return;
+            const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+            const newId = `f_m${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+            cloudFolders.push({
+                id: newId,
+                name: f.name,
+                parentFolderId: folderIdByPath.get(parentPath) || null,
+                created: f.created || new Date().toISOString()
+            });
+            folderIdByPath.set(path, newId);
+            addedFolders++;
+        });
+
+        const cardsKey = (cards) => JSON.stringify((Array.isArray(cards) ? cards : []).map(c => [
+            String(c.front || ''), String(c.back || ''), c.mediaUrl ? String(c.mediaUrl) : ''
+        ]));
+        const sameDeck = (a, b) =>
+            String(a.category || '') === String(b.category || '') &&
+            (a.shuffle !== false) === (b.shuffle !== false) &&
+            cardsKey(a.cards) === cardsKey(b.cards);
+
+        let addedDecks = 0;
+        let keptBoth = 0;
+        localDecks.forEach(localDeck => {
+            const path = pathOf(localFolders, localDeck.folderId);
+            const folderId = folderIdByPath.has(path) ? folderIdByPath.get(path) : null;
+            const inSamePlace = (d) => (d.folderId || null) === (folderId || null);
+            const nameKey = String(localDeck.name || '').trim().toLowerCase();
+
+            const twin = cloudDecks.find(d => inSamePlace(d) && String(d.name || '').trim().toLowerCase() === nameKey);
+            if (!twin) {
+                cloudDecks.push({ ...localDeck, folderId });
+                addedDecks++;
+                return;
+            }
+            if (sameDeck(twin, localDeck)) return;
+
+            // Different content: keep both. Reuse an existing identical copy
+            // if a previous merge already added one.
+            let copyName = `${localDeck.name} (from this device)`;
+            let n = 2;
+            while (true) {
+                const existing = cloudDecks.find(d => inSamePlace(d) && d.name === copyName);
+                if (!existing) break;
+                if (sameDeck(existing, localDeck)) return;
+                copyName = `${localDeck.name} (from this device ${n++})`;
+            }
+            cloudDecks.push({ ...localDeck, name: copyName, folderId });
+            keptBoth++;
+        });
+
+        // Study history: keep every session from both sides, no duplicates.
+        const sessions = [];
+        const seenSessions = new Set();
+        const addSessions = (list) => (Array.isArray(list) ? list : []).forEach(s => {
+            const key = `${s.timestamp}|${s.deckName}|${s.cardsStudied}`;
+            if (seenSessions.has(key)) return;
+            seenSessions.add(key);
+            sessions.push(s);
+        });
+        addSessions(cloud.stats && cloud.stats.studySessions);
+        addSessions(local.stats && local.stats.studySessions);
+        sessions.sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
+
+        return {
+            data: {
+                folders: cloudFolders,
+                decks: cloudDecks,
+                settings: cloud.settings || local.settings || {},
+                stats: { ...(local.stats || {}), ...(cloud.stats || {}), studySessions: sessions }
+            },
+            addedDecks,
+            keptBoth,
+            addedFolders
+        };
     }
 
     async resetStats() {
@@ -1765,6 +1943,7 @@ class SparkDeckApp {
 
         const safeName = this.escapeHtml(deck.name);
         const safeCategory = this.escapeHtml(deck.category);
+        const quizBlocked = deck.cards.length < 4;
         deckEl.innerHTML = `
             <div class="deck-header">
                 <h4 id="deck-title-${deckIndex}" class="deck-title">${safeName}</h4>
@@ -1782,9 +1961,11 @@ class SparkDeckApp {
                          aria-labelledby="${menuBtnId}"
                          hidden>
                         <button type="button" role="menuitem" class="deck-menu-item" data-action="study" data-deck-index="${deckIndex}">Study</button>
-                        <button type="button" role="menuitem" class="deck-menu-item" data-action="quiz" data-deck-index="${deckIndex}" ${deck.cards.length < 4 ? 'disabled' : ''}>Quiz</button>
+                        <button type="button" role="menuitem" class="deck-menu-item" data-action="quiz" data-deck-index="${deckIndex}" ${quizBlocked ? `disabled aria-describedby="quiz-note-${deckIndex}"` : ''}>Quiz${quizBlocked ? ' (needs 4 cards)' : ''}</button>
                         <button type="button" role="menuitem" class="deck-menu-item" data-action="edit" data-deck-index="${deckIndex}">Edit Cards</button>
-                        <button type="button" role="menuitem" class="deck-menu-item" data-action="export" data-deck-index="${deckIndex}">Export</button>
+                        <button type="button" role="menuitem" class="deck-menu-item" data-action="export" data-deck-index="${deckIndex}">Export Backup File (JSON)</button>
+                        <button type="button" role="menuitem" class="deck-menu-item" data-action="export-csv" data-deck-index="${deckIndex}">Export Spreadsheet (CSV)</button>
+                        <button type="button" role="menuitem" class="deck-menu-item" data-action="export-text" data-deck-index="${deckIndex}">Export Text File</button>
                         <button type="button" role="menuitem" class="deck-menu-item" data-action="move" data-deck-index="${deckIndex}">Move to Folder…</button>
                         <button type="button" role="menuitem" class="deck-menu-item" data-action="toggle-shuffle" data-deck-index="${deckIndex}">${deck.shuffle === false ? 'Enable Shuffle' : 'Disable Shuffle'}</button>
                         <div class="deck-menu-separator" role="separator"></div>
@@ -1792,11 +1973,12 @@ class SparkDeckApp {
                     </div>
                 </div>
             </div>
-            <p>${deck.cards.length} cards &bull; ${safeCategory}${deck.shuffle === false ? ' &bull; Sequential' : ''}</p>
+            <p>${deck.cards.length} card${deck.cards.length !== 1 ? 's' : ''} &bull; ${safeCategory}${deck.shuffle === false ? ' &bull; Sequential' : ''}</p>
             <div class="button-group deck-actions">
                 <button type="button" class="deck-study-btn" data-deck-index="${deckIndex}" aria-label="Study deck ${safeName}">Study</button>
-                <button type="button" class="deck-quiz-btn" data-deck-index="${deckIndex}" aria-label="Quiz deck ${safeName}" ${deck.cards.length < 4 ? 'disabled title="Need at least 4 cards for quiz"' : ''}>Quiz</button>
+                <button type="button" class="deck-quiz-btn" data-deck-index="${deckIndex}" aria-label="Quiz deck ${safeName}" ${quizBlocked ? `disabled aria-describedby="quiz-note-${deckIndex}"` : ''}>Quiz</button>
             </div>
+            ${quizBlocked ? `<p id="quiz-note-${deckIndex}" class="quiz-disabled-note">Quiz unlocks at 4 cards. This deck has ${deck.cards.length}, so add ${4 - deck.cards.length} more. To add cards, open the "Actions for ${safeName}" button next to the deck name and choose Edit Cards.</p>` : ''}
         `;
 
         // Setup menu button
@@ -1816,7 +1998,7 @@ class SparkDeckApp {
                 // Close menu first before any action
                 this.closeDeckMenu(menuBtn, menu, false);
                 // For export, blur after menu closes so save dialog can focus
-                if (action === 'export') {
+                if (action && action.startsWith('export')) {
                     document.activeElement?.blur();
                 }
                 this.handleDeckMenuAction(e.target);
@@ -1943,6 +2125,12 @@ class SparkDeckApp {
                 break;
             case 'export':
                 this.exportDeck(deckIndex);
+                break;
+            case 'export-csv':
+                this.exportDeckAs(deckIndex, 'csv');
+                break;
+            case 'export-text':
+                this.exportDeckAs(deckIndex, 'text');
                 break;
             case 'move':
                 await this.promptMoveDeck(deckIndex);
@@ -2131,23 +2319,48 @@ class SparkDeckApp {
         }
     }
 
+    // Show a visible message under the Generate button. The element is a
+    // role="status" live region, so screen readers hear it too.
+    setGenerateStatus(message, type) {
+        if (!this.generateStatus) return;
+        this.generateStatus.classList.remove('is-error', 'is-success');
+        if (type) this.generateStatus.classList.add(`is-${type}`);
+        this.generateStatus.textContent = message || '';
+    }
+
     generateCards() {
         const notes = this.notesInput.value.trim();
         if (!notes) {
-            this.announce('Please paste your study notes first.');
+            this.setGenerateStatus('Please paste your study notes into the box above first.', 'error');
             this.notesInput.focus();
             return;
         }
 
-        this.tempCards = this.parseNotes(notes);
+        const newCards = this.parseNotes(notes);
 
-        if (this.tempCards.length === 0) {
-            this.announce('No flashcards could be generated. Please check your notes format.');
+        if (newCards.length === 0) {
+            this.setGenerateStatus(
+                'No cards could be made from these notes. Put each item on its own line, as either a question ending in a question mark with the answer on the next line, "Term: definition", or "Term - definition". Open Help for more examples.',
+                'error'
+            );
+            this.soundManager.play('wrong');
             return;
         }
 
+        // Add to any cards already in this deck instead of replacing them.
+        this.tempCards = (this.tempCards || []).concat(newCards);
         this.showPreview();
-        this.announce(`Successfully generated ${this.tempCards.length} flashcards.`);
+
+        const made = `${newCards.length} card${newCards.length !== 1 ? 's' : ''}`;
+        this.setGenerateStatus(
+            `Made ${made}. This deck now has ${this.tempCards.length} card${this.tempCards.length !== 1 ? 's' : ''}. Check them in the Cards Preview below, then select Save Deck. Cards are not saved until you do.`,
+            'success'
+        );
+        if (this.cardsPreview && typeof this.cardsPreview.scrollIntoView === 'function') {
+            const reduce = this.settings.reducedMotion ||
+                (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            this.cardsPreview.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+        }
     }
 
     parseNotes(notes) {
@@ -2171,6 +2384,17 @@ class SparkDeckApp {
                     const definition = lines[i + 1];
                     cards.push({ front: `What is ${term}?`, back: definition });
                     i++;
+                }
+            }
+            else if (/\s[-\u2013\u2014]\s/.test(line) && !line.includes('?') && !line.includes(':')) {
+                // "Term - definition" (hyphen, en dash, or em dash with spaces around it)
+                const match = line.match(/^(.+?)\s[-\u2013\u2014]\s(.+)$/);
+                if (match) {
+                    const term = match[1].trim();
+                    const definition = match[2].trim();
+                    if (term && definition.length > 10) {
+                        cards.push({ front: `What is ${term}?`, back: definition });
+                    }
                 }
             }
             else if (line.includes(':') && !line.includes('?')) {
@@ -2247,6 +2471,7 @@ class SparkDeckApp {
                 </div>
                 <p><strong>Front:</strong> ${this.escapeHtml(card.front)}</p>
                 <p><strong>Back:</strong> ${this.escapeHtml(card.back)}</p>
+                ${card.mediaUrl ? `<p><strong>Link:</strong> ${this.escapeHtml(card.mediaUrl)}</p>` : ''}
             `;
             cardElement.querySelector('.card-edit-btn').addEventListener('click', () => this.editCard(index));
             cardElement.querySelector('.card-remove-btn').addEventListener('click', () => this.removeCard(index));
@@ -2347,6 +2572,7 @@ class SparkDeckApp {
     }
 
     resetCreateForm() {
+        this.setGenerateStatus('');
         this.deckName.value = '';
         this.deckCategory.value = 'Biology';
         this.notesInput.value = '';
@@ -2451,12 +2677,104 @@ class SparkDeckApp {
         const side = this.showingFront ? 'front' : 'back';
 
         this.cardContent.textContent = content;
+        const hasMedia = !this.showingFront && this.getSafeMediaUrl(card.mediaUrl);
         this.flashcard.setAttribute('aria-label',
-            `Card ${this.currentCardIndex + 1} of ${this.currentDeck.cards.length}, showing ${side}. ${content}. Press Space or Enter to flip.`
+            `Card ${this.currentCardIndex + 1} of ${this.currentDeck.cards.length}, showing ${side}. ${content}.${hasMedia ? ' This card has a video link below.' : ''} Press Space or Enter to flip.`
         );
+        this.renderCardMedia(card);
 
         this.prevBtn.disabled = this.currentCardIndex === 0;
         this.nextBtn.disabled = this.currentCardIndex === this.currentDeck.cards.length - 1;
+    }
+
+    // Only allow http(s) links; anything else is ignored.
+    getSafeMediaUrl(url) {
+        if (typeof url !== 'string') return null;
+        const trimmed = url.trim();
+        return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+    }
+
+    // Returns the 11-character video ID for common YouTube link formats, or null.
+    getYouTubeId(url) {
+        try {
+            const u = new URL(url);
+            const host = u.hostname.replace(/^www\.|^m\./, '');
+            let id = null;
+            if (host === 'youtu.be') {
+                id = u.pathname.slice(1).split('/')[0];
+            } else if (host === 'youtube.com' || host === 'youtube-nocookie.com' || host === 'music.youtube.com') {
+                if (u.pathname === '/watch') id = u.searchParams.get('v');
+                else {
+                    const m = u.pathname.match(/^\/(embed|shorts|live|v)\/([^/?#]+)/);
+                    if (m) id = m[2];
+                }
+            }
+            return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    // Show the card's link under the flashcard, on the back side only.
+    renderCardMedia(card) {
+        const area = this.cardMediaArea;
+        if (!area) return;
+        area.innerHTML = '';
+        const url = this.showingFront ? null : this.getSafeMediaUrl(card && card.mediaUrl);
+        if (!url) {
+            area.classList.add('hidden');
+            return;
+        }
+        area.classList.remove('hidden');
+
+        const youTubeId = this.getYouTubeId(url);
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = youTubeId ? 'Open the video on YouTube (opens in a new tab)' : 'Open the linked resource (opens in a new tab)';
+
+        if (youTubeId) {
+            const playBtn = document.createElement('button');
+            playBtn.type = 'button';
+            playBtn.className = 'secondary-btn';
+            playBtn.textContent = 'Play video here';
+            playBtn.setAttribute('aria-expanded', 'false');
+            playBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const existing = area.querySelector('.media-embed-wrapper');
+                if (existing) {
+                    existing.remove();
+                    playBtn.textContent = 'Play video here';
+                    playBtn.setAttribute('aria-expanded', 'false');
+                    return;
+                }
+                const wrapper = document.createElement('div');
+                wrapper.className = 'media-embed-wrapper';
+                const iframe = document.createElement('iframe');
+                iframe.src = `https://www.youtube-nocookie.com/embed/${youTubeId}`;
+                iframe.title = 'Video for this card';
+                iframe.allow = 'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+                iframe.allowFullscreen = true;
+                iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+                wrapper.appendChild(iframe);
+                area.appendChild(wrapper);
+                playBtn.textContent = 'Hide video';
+                playBtn.setAttribute('aria-expanded', 'true');
+                iframe.focus();
+            });
+            const row = document.createElement('div');
+            row.className = 'button-group';
+            row.style.justifyContent = 'center';
+            row.style.alignItems = 'center';
+            row.appendChild(playBtn);
+            row.appendChild(link);
+            area.appendChild(row);
+        } else {
+            const p = document.createElement('p');
+            p.appendChild(link);
+            area.appendChild(p);
+        }
     }
 
     flipCard() {
@@ -2467,8 +2785,10 @@ class SparkDeckApp {
         this.displayCurrentCard();
 
         const side = this.showingFront ? 'front' : 'back';
-        const content = this.currentDeck.cards[this.currentCardIndex][this.showingFront ? 'front' : 'back'];
-        this.announce(`Flipped to ${side}: ${content}`);
+        const currentCard = this.currentDeck.cards[this.currentCardIndex];
+        const content = currentCard[this.showingFront ? 'front' : 'back'];
+        const mediaNote = !this.showingFront && this.getSafeMediaUrl(currentCard.mediaUrl) ? ' This card has a video link below.' : '';
+        this.announce(`Flipped to ${side}: ${content}.${mediaNote}`);
     }
 
     previousCard() {
@@ -2494,6 +2814,10 @@ class SparkDeckApp {
     endStudy() {
         this.soundManager.play('exitStudy');
         this.currentDeck = null;
+        if (this.cardMediaArea) {
+            this.cardMediaArea.innerHTML = '';
+            this.cardMediaArea.classList.add('hidden');
+        }
 
         // Hide study overlay
         this.studyOverlay.classList.add('hidden');
@@ -3352,9 +3676,130 @@ SparkDeckApp.prototype.exportAllData = function() {
     this.announce(`Downloading ${filename}. Contains ${this.decks.length} decks and ${this.folders.length} folders.`);
 };
 
+// Helper: full folder path for a deck, like "Science / Biology", or "" at top level
+SparkDeckApp.prototype._getFolderPath = function(folderId) {
+    const names = [];
+    const seen = new Set();
+    let current = folderId ? this.folders.find(f => f.id === folderId) : null;
+    while (current && !seen.has(current.id)) {
+        seen.add(current.id);
+        names.unshift(current.name);
+        current = current.parentFolderId ? this.folders.find(f => f.id === current.parentFolderId) : null;
+    }
+    return names.join(' / ');
+};
+
+// Build CSV text for a list of decks: a header row, then one row per card.
+// Columns: Folder, Deck, Category, Card Number, Front, Back, Link.
+// This is also the format CSV import reads, so files round-trip.
+SparkDeckApp.prototype._buildCSV = function(decks) {
+    const cell = (value) => {
+        let text = value === undefined || value === null ? '' : String(value);
+        // Stop spreadsheet apps from treating card text as a formula.
+        // Import removes this apostrophe again.
+        if (/^[=+@\t\r]/.test(text) || /^-\S/.test(text)) text = "'" + text;
+        return '"' + text.replace(/"/g, '""') + '"';
+    };
+
+    const rows = [['Folder', 'Deck', 'Category', 'Card Number', 'Front', 'Back', 'Link']];
+    let cardCount = 0;
+    decks.forEach(deck => {
+        const folder = this._getFolderPath(deck.folderId) || '(No folder)';
+        const cards = Array.isArray(deck.cards) ? deck.cards : [];
+        cards.forEach((card, i) => {
+            rows.push([folder, deck.name, deck.category || '', i + 1, card.front, card.back, card.mediaUrl || '']);
+            cardCount++;
+        });
+    });
+
+    // Byte order mark so Excel opens accented characters and emoji correctly.
+    return { text: '﻿' + rows.map(r => r.map(cell).join(',')).join('\r\n'), cardCount };
+};
+
+// Build a plain, human-readable text listing of decks and cards.
+SparkDeckApp.prototype._buildText = function(decks) {
+    const now = new Date();
+    const cardCount = decks.reduce((sum, d) => sum + (Array.isArray(d.cards) ? d.cards.length : 0), 0);
+    const lines = [
+        'SparkDeck flashcards',
+        `Exported ${now.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`,
+        `${decks.length} deck${decks.length !== 1 ? 's' : ''}, ${cardCount} card${cardCount !== 1 ? 's' : ''}`,
+        ''
+    ];
+    decks.forEach(deck => {
+        const cards = Array.isArray(deck.cards) ? deck.cards : [];
+        const folder = this._getFolderPath(deck.folderId);
+        lines.push('========================================');
+        lines.push(`Deck: ${deck.name}`);
+        if (folder) lines.push(`Folder: ${folder}`);
+        lines.push(`Category: ${deck.category || 'None'}`);
+        lines.push(`Cards: ${cards.length}`);
+        lines.push('========================================');
+        lines.push('');
+        cards.forEach((card, i) => {
+            lines.push(`Card ${i + 1}`);
+            lines.push(`Front: ${card.front}`);
+            lines.push(`Back: ${card.back}`);
+            if (card.mediaUrl) lines.push(`Link: ${card.mediaUrl}`);
+            lines.push('');
+        });
+    });
+    return { text: lines.join('\r\n'), cardCount };
+};
+
+// Export all decks as a CSV spreadsheet.
+SparkDeckApp.prototype.exportAllAsCSV = function() {
+    if (this.decks.length === 0) {
+        this.announce('No decks to export.');
+        return;
+    }
+    document.activeElement?.blur();
+    const { text, cardCount } = this._buildCSV(this.decks);
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `sparkdeck-cards-${date}.csv`;
+    this._downloadFile(text, filename, 'text/csv;charset=utf-8');
+    this.announce(`Downloading ${filename}. Contains ${this.decks.length} decks and ${cardCount} cards.`);
+};
+
+// Export all decks as a plain text file.
+SparkDeckApp.prototype.exportAllAsText = function() {
+    if (this.decks.length === 0) {
+        this.announce('No decks to export.');
+        return;
+    }
+    document.activeElement?.blur();
+    const { text, cardCount } = this._buildText(this.decks);
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `sparkdeck-cards-${date}.txt`;
+    this._downloadFile(text, filename, 'text/plain;charset=utf-8');
+    this.announce(`Downloading ${filename}. Contains ${this.decks.length} decks and ${cardCount} cards.`);
+};
+
+// Export one deck as CSV ('csv') or plain text ('text').
+SparkDeckApp.prototype.exportDeckAs = function(deckIndex, format) {
+    const deck = this.decks[deckIndex];
+    if (!deck) {
+        this.announce('Deck not found.');
+        return;
+    }
+    const base = deck.name.replace(/[^a-z0-9]/gi, '-');
+    const built = format === 'csv' ? this._buildCSV([deck]) : this._buildText([deck]);
+    const filename = `${base}.${format === 'csv' ? 'csv' : 'txt'}`;
+    this._downloadFile(built.text, filename, format === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8');
+    // Delay announcement to let menu close/blur events settle for screen readers
+    setTimeout(() => {
+        this.announce(`Downloading ${filename}. Check your Downloads folder.`);
+    }, 150);
+};
+
 // Helper: Download JSON data as file
 SparkDeckApp.prototype._downloadJSON = function(data, filename) {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    this._downloadFile(JSON.stringify(data, null, 2), filename, 'application/json');
+};
+
+// Helper: Download any text content as a file
+SparkDeckApp.prototype._downloadFile = function(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -3373,7 +3818,7 @@ SparkDeckApp.prototype.triggerImport = function() {
         fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.id = 'import-file-input';
-        fileInput.accept = '.json,application/json';
+        fileInput.accept = '.json,application/json,.csv,text/csv';
         fileInput.style.display = 'none';
         fileInput.addEventListener('change', (e) => this._handleImportFile(e));
         document.body.appendChild(fileInput);
@@ -3403,17 +3848,45 @@ SparkDeckApp.prototype._sanitizeCards = function(cards) {
         }));
 };
 
+// Show an import result on screen (under the Import button) and announce it.
+SparkDeckApp.prototype._reportImport = function(message, type) {
+    const status = document.getElementById('import-status');
+    if (status) {
+        status.classList.remove('is-error', 'is-success');
+        if (type) status.classList.add(`is-${type}`);
+        status.textContent = message;
+    }
+    this.announce(message);
+};
+
 // Handle the imported file
 SparkDeckApp.prototype._handleImportFile = async function(event) {
     const file = event.target.files[0];
     if (!file) return;
+
+    // 5 MB is far more than any real deck file; anything bigger is likely the wrong file.
+    if (file.size > 5 * 1024 * 1024) {
+        this._reportImport('That file is too large to import (the limit is 5 MB). Please choose a SparkDeck backup file or a CSV spreadsheet.', 'error');
+        return;
+    }
+
+    const isCSV = /\.csv$/i.test(file.name) || file.type === 'text/csv';
+    if (isCSV) {
+        try {
+            await this._importCSV(await file.text(), file.name);
+        } catch (error) {
+            console.warn('CSV import error:', error);
+            this._reportImport('Could not read that CSV file. Please check that it is a spreadsheet saved as CSV.', 'error');
+        }
+        return;
+    }
 
     try {
         const text = await file.text();
         const data = JSON.parse(text);
 
         if (!data.version || !data.type) {
-            this.announce('Invalid file format. Please select a SparkDeck export file.');
+            this._reportImport('This file is not a SparkDeck export. Please choose a SparkDeck backup file or a CSV spreadsheet.', 'error');
             return;
         }
 
@@ -3422,11 +3895,11 @@ SparkDeckApp.prototype._handleImportFile = async function(event) {
         } else if (data.type === 'backup') {
             await this._importBackup(data);
         } else {
-            this.announce('Unknown file type. Please select a valid SparkDeck export file.');
+            this._reportImport('This file is not a SparkDeck export. Please choose a SparkDeck backup file or a CSV spreadsheet.', 'error');
         }
     } catch (error) {
         console.warn('Import error:', error);
-        this.announce('Error reading file. Please ensure it is a valid JSON file.');
+        this._reportImport('Could not read that file. Please choose a SparkDeck backup file (.json) or a spreadsheet saved as CSV (.csv).', 'error');
     }
 };
 
@@ -3458,7 +3931,7 @@ SparkDeckApp.prototype._importSingleDeck = async function(data) {
             cancelText: 'Cancel'
         });
         if (!confirmed) {
-            this.announce('Import cancelled.');
+            this._reportImport('Import cancelled. Nothing was changed.');
             return;
         }
         // Replace existing deck
@@ -3482,7 +3955,7 @@ SparkDeckApp.prototype._importSingleDeck = async function(data) {
 
     if (this.saveDecks()) {
         this.renderDecks();
-        this.announce(`Deck "${safeName}" imported successfully with ${safeCards.length} cards.`);
+        this._reportImport(`Imported the deck "${safeName}" with ${safeCards.length} card${safeCards.length !== 1 ? 's' : ''}.`, 'success');
     } else {
         this.announce('Error saving imported deck.');
     }
@@ -3506,7 +3979,7 @@ SparkDeckApp.prototype._importBackup = async function(data) {
     });
 
     if (!confirmed) {
-        this.announce('Import cancelled.');
+        this._reportImport('Import cancelled. Nothing was changed.');
         return;
     }
 
@@ -3585,8 +4058,213 @@ SparkDeckApp.prototype._importBackup = async function(data) {
         if (skippedCount > 0) {
             message += `, skipped ${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''}`;
         }
-        this.announce(message + '.');
+        this._reportImport(message + '.', 'success');
     } else {
         this.announce('Error saving imported data.');
+    }
+};
+
+// ---- CSV import ----
+// Expected format (the same one "Download Spreadsheet (CSV)" creates):
+//   First row: column names. Front and Back are required. Optional: Deck,
+//   Category, Folder, Link. Other columns (like Card Number) are ignored.
+//   Each following row is one card.
+// A file with no recognizable header, where every row has at least two
+// columns, is read as front,back pairs without a header.
+
+// Split CSV text into rows of cells. Handles quoted cells, "" inside quotes,
+// commas and line breaks inside quotes, Windows line endings, and a leading
+// byte order mark. Detects comma, semicolon, or tab separators.
+SparkDeckApp.prototype._parseCSV = function(text) {
+    text = String(text || '').replace(/^﻿/, '');
+    // Pick the separator that appears most in the first line (outside quotes).
+    let firstLine = '';
+    let inQ = false;
+    for (const ch of text) {
+        if (ch === '"') inQ = !inQ;
+        if (!inQ && (ch === '\n' || ch === '\r')) break;
+        if (!inQ) firstLine += ch;
+    }
+    const counts = { ',': 0, ';': 0, '\t': 0 };
+    for (const ch of firstLine) if (ch in counts) counts[ch]++;
+    const sep = Object.keys(counts).reduce((a, b) => (counts[b] > counts[a] ? b : a), ',');
+
+    const rows = [];
+    let row = [];
+    let cellText = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+            if (ch === '"') {
+                if (text[i + 1] === '"') { cellText += '"'; i++; }
+                else inQuotes = false;
+            } else {
+                cellText += ch;
+            }
+        } else if (ch === '"') {
+            inQuotes = true;
+        } else if (ch === sep) {
+            row.push(cellText); cellText = '';
+        } else if (ch === '\n' || ch === '\r') {
+            if (ch === '\r' && text[i + 1] === '\n') i++;
+            row.push(cellText); rows.push(row);
+            row = []; cellText = '';
+        } else {
+            cellText += ch;
+        }
+    }
+    if (cellText !== '' || row.length) { row.push(cellText); rows.push(row); }
+    if (inQuotes) throw new Error('Unclosed quote in CSV');
+    return rows;
+};
+
+// Undo the apostrophe that export adds in front of formula-like text.
+SparkDeckApp.prototype._csvCellValue = function(value) {
+    const text = String(value === undefined || value === null ? '' : value).trim();
+    return /^'[=+@\-\t\r]/.test(text) ? text.slice(1) : text;
+};
+
+// Find or create a folder path like "Science / Biology". Returns its id or null.
+SparkDeckApp.prototype._ensureFolderPath = function(pathText) {
+    const clean = String(pathText || '').trim();
+    if (!clean || clean.toLowerCase() === '(no folder)') return null;
+    let parentId = null;
+    for (const rawName of clean.split('/')) {
+        const name = this._stripHtml(rawName).trim().slice(0, 200);
+        if (!name) continue;
+        let folder = this.folders.find(f =>
+            f.name.toLowerCase() === name.toLowerCase() && (f.parentFolderId || null) === parentId);
+        if (!folder) {
+            if (this.folders.length >= 200) return parentId; // stay within the cloud limit
+            folder = { id: this.generateFolderId(), name, parentFolderId: parentId, created: new Date().toISOString() };
+            this.folders.push(folder);
+        }
+        parentId = folder.id;
+    }
+    return parentId;
+};
+
+SparkDeckApp.prototype._importCSV = async function(text, fileName) {
+    const rows = this._parseCSV(text).filter(r => r.some(c => String(c).trim() !== ''));
+    if (rows.length === 0) {
+        this._reportImport('That CSV file is empty.', 'error');
+        return;
+    }
+    if (rows.length > 10001) {
+        this._reportImport('That CSV file has more than 10,000 rows. Please split it into smaller files.', 'error');
+        return;
+    }
+
+    // Work out which column is which.
+    const names = {
+        front: ['front', 'question', 'term'],
+        back: ['back', 'answer', 'definition'],
+        deck: ['deck', 'deck name'],
+        category: ['category'],
+        folder: ['folder'],
+        link: ['link', 'media', 'media url', 'video', 'url']
+    };
+    const header = rows[0].map(h => String(h).trim().toLowerCase());
+    const col = {};
+    Object.keys(names).forEach(key => {
+        const idx = header.findIndex(h => names[key].includes(h));
+        if (idx !== -1) col[key] = idx;
+    });
+
+    let dataRows;
+    let headerless = false;
+    if (col.front !== undefined && col.back !== undefined) {
+        dataRows = rows.slice(1).map((r, i) => ({ r, line: i + 2 }));
+    } else if (rows.every(r => r.length >= 2) && col.front === undefined && col.back === undefined) {
+        // No header: read as front, back.
+        col.front = 0; col.back = 1;
+        headerless = true;
+        dataRows = rows.map((r, i) => ({ r, line: i + 1 }));
+    } else {
+        this._reportImport('This CSV file needs a first row with column names, including "Front" and "Back". Optional columns are Deck, Category, Folder, and Link. Open Help for the full format.', 'error');
+        return;
+    }
+
+    const defaultDeckName = (String(fileName || 'Imported deck').replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim() || 'Imported deck').slice(0, 200);
+    const groups = new Map();
+    const skippedLines = [];
+    dataRows.forEach(({ r, line }) => {
+        const get = (key) => (col[key] !== undefined ? this._csvCellValue(r[col[key]]) : '');
+        const front = get('front');
+        const back = get('back');
+        if (!front || !back) { skippedLines.push(line); return; }
+        const deckName = this._stripHtml(get('deck')).slice(0, 200).trim() || defaultDeckName;
+        const folderPath = get('folder');
+        const key = `${folderPath.toLowerCase()}|${deckName.toLowerCase()}`;
+        if (!groups.has(key)) {
+            groups.set(key, { deckName, folderPath, category: this._stripHtml(get('category')).slice(0, 100).trim(), cards: [] });
+        }
+        const link = get('link');
+        groups.get(key).cards.push({ front, back, mediaUrl: link || undefined });
+    });
+
+    if (groups.size === 0) {
+        this._reportImport('No cards were found. Every card needs text in both the Front and Back columns.', 'error');
+        return;
+    }
+    if (this.decks.length + groups.size > 500) {
+        this._reportImport(`This file would bring you to more than 500 decks, which is the limit. Nothing was imported.`, 'error');
+        return;
+    }
+
+    const cardTotal = Array.from(groups.values()).reduce((n, g) => n + g.cards.length, 0);
+    let message = headerless
+        ? `This file has no column names (no "Front" and "Back" in the first row), so the first column is used as the front of each card and the second column as the back, starting from the very first row. If that's not right, choose Cancel and add a first row with column names. `
+        : '';
+    message += `This file has ${cardTotal} card${cardTotal !== 1 ? 's' : ''} in ${groups.size} deck${groups.size !== 1 ? 's' : ''}. They will be added as new decks; your existing decks are not changed. Decks whose name is already used in the same folder get "(imported)" added to their name.`;
+    if (skippedLines.length) {
+        message += ` ${skippedLines.length} row${skippedLines.length !== 1 ? 's are' : ' is'} missing a front or back and will be skipped.`;
+    }
+    const confirmed = await this.openConfirmModal({
+        title: 'Import spreadsheet',
+        message,
+        confirmText: 'Import',
+        cancelText: 'Cancel'
+    });
+    if (!confirmed) {
+        this._reportImport('Import cancelled. Nothing was changed.');
+        return;
+    }
+
+    let renamed = 0;
+    groups.forEach(group => {
+        const folderId = this._ensureFolderPath(group.folderPath);
+        let name = group.deckName;
+        const taken = (n) => this.decks.some(d =>
+            d.name.toLowerCase() === n.toLowerCase() && (d.folderId || null) === (folderId || null));
+        if (taken(name)) {
+            renamed++;
+            name = `${group.deckName} (imported)`;
+            let i = 2;
+            while (taken(name)) name = `${group.deckName} (imported ${i++})`;
+        }
+        this.decks.push({
+            name,
+            category: group.category || 'Other',
+            folderId,
+            cards: this._sanitizeCards(group.cards),
+            created: new Date().toISOString()
+        });
+    });
+
+    this.saveFolders();
+    if (this.saveDecks()) {
+        this.populateFolderOptions(this.deckFolder);
+        this.renderDecks();
+        let done = `Imported ${cardTotal} card${cardTotal !== 1 ? 's' : ''} into ${groups.size} deck${groups.size !== 1 ? 's' : ''}.`;
+        if (renamed) done += ` ${renamed} deck${renamed !== 1 ? 's were' : ' was'} renamed with "(imported)" because the name was already used.`;
+        if (skippedLines.length) {
+            const shown = skippedLines.slice(0, 10).join(', ');
+            done += ` Skipped ${skippedLines.length} row${skippedLines.length !== 1 ? 's' : ''} missing a front or back (row${skippedLines.length !== 1 ? 's' : ''} ${shown}${skippedLines.length > 10 ? ', and more' : ''}).`;
+        }
+        this._reportImport(done, 'success');
+    } else {
+        this._reportImport('Could not save the imported decks. Your device storage may be full.', 'error');
     }
 };

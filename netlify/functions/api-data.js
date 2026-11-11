@@ -18,7 +18,7 @@
 // Headers: Authorization: Bearer <firebase-id-token>
 
 const { query, getPool } = require("./utils/db");
-const { authenticateRequest } = require("./utils/auth");
+const { authenticateRequest, emailNotVerifiedResponse } = require("./utils/auth");
 
 // ─── GET: Load all user data ───────────────────────────────────────────
 
@@ -323,7 +323,13 @@ exports.handler = async function (event) {
         };
     }
 
-    const { uid } = authResult.user;
+    const { uid, emailVerified } = authResult.user;
+
+    // Unverified accounts are device-only: no cloud reads or writes.
+    // Checked before any database query.
+    if (!emailVerified) {
+        return emailNotVerifiedResponse();
+    }
 
     // Look up the database user ID from the Firebase UID
     const userResult = await query(

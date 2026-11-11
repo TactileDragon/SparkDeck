@@ -1811,6 +1811,461 @@
             background: var(--danger-color);
             color: #000000;
         }
+
+        /* ========================================
+           v1 revision fixes (visual audit, Nov 2026)
+           Kept at the end so these win over earlier rules.
+           ======================================== */
+
+        /* --- Buttons: size to their label instead of stretching across the page --- */
+        button {
+            width: auto;
+            padding: 10px 20px;
+        }
+        .button-group {
+            flex-wrap: wrap;
+        }
+        /* The main sign-in / sign-up button stays full width, like the fields above it */
+        .auth-form button[type="submit"] {
+            width: 100%;
+        }
+
+        /* --- Tabs: labels always readable, selected or not --- */
+        .nav-tabs {
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .nav-tab,
+        .nav-tab:hover {
+            width: auto;
+            background: #ffffff;
+            color: #1f5f99;              /* 6.4:1 on white */
+            border: 2px solid transparent;
+            border-bottom: 3px solid transparent;
+            border-radius: 6px 6px 0 0;
+        }
+        .nav-tab:hover {
+            background: #eef5fb;
+            border-color: #c7dcef;
+        }
+        .nav-tab:focus-visible {
+            outline: 3px solid #1f5f99;
+            outline-offset: 2px;
+        }
+        .nav-tab.active,
+        .nav-tab[aria-selected="true"] {
+            background: #ffffff;
+            color: #1f5f99;
+            border-color: #dee2e6;
+            border-bottom: 4px solid #1f5f99;
+            font-weight: 700;
+        }
+
+        body.dark-mode .nav-tab,
+        body.dark-mode .nav-tab:hover {
+            background: #1f5f99;
+            color: #ffffff;              /* 6.4:1 on that blue */
+            border-color: #1f5f99;
+        }
+        body.dark-mode .nav-tab:hover {
+            background: #2a71b3;
+            border-color: #2a71b3;
+        }
+        body.dark-mode .nav-tab:focus-visible {
+            outline: 3px solid #ffffff;
+        }
+        body.dark-mode .nav-tab.active,
+        body.dark-mode .nav-tab[aria-selected="true"] {
+            background: #0d3a63;
+            color: #ffffff;
+            border-color: #52b6e8;
+            border-bottom: 4px solid #ffffff;
+        }
+
+        body.high-contrast .nav-tab,
+        body.high-contrast .nav-tab:hover {
+            background: #000000;
+            color: #ffffff;
+            border-color: #ffffff;
+        }
+        body.high-contrast .nav-tab.active,
+        body.high-contrast .nav-tab[aria-selected="true"] {
+            background: #ffff00;
+            color: #000000;
+            border-color: #ffff00;
+        }
+
+        /* --- Help pop-up: left-aligned, top-aligned, readable line length --- */
+        #help-modal {
+            margin: auto;
+            padding: 0;
+            border: none;
+            background: transparent;
+            max-width: none;
+            max-height: none;
+        }
+        #help-modal .modal-dialog {
+            width: min(860px, 94vw);
+            height: auto;
+            max-height: 90vh;
+        }
+        #help-modal .modal-header {
+            padding: 16px 24px;
+        }
+        #help-modal .modal-title {
+            margin: 0;
+        }
+        #help-modal .modal-body {
+            display: block;              /* was a vertically centered flex box, which cut off the top */
+            text-align: left;
+            padding: 8px 24px 24px;
+            overflow-y: auto;
+        }
+        #help-modal .modal-body h2 {
+            font-size: 1.25em;
+            margin: 28px 0 8px;
+            padding-top: 16px;
+            border-top: 1px solid #dee2e6;
+        }
+        #help-modal .modal-body h3 {
+            font-size: 1.05em;
+            margin: 18px 0 6px;
+        }
+        #help-modal .modal-body p {
+            margin: 0 0 10px;
+        }
+        #help-modal .modal-body ul,
+        #help-modal .modal-body ol {
+            display: block;
+            margin: 0 0 12px 1.5em;
+            padding: 0;
+        }
+        #help-modal .modal-body li {
+            margin-bottom: 6px;
+        }
+        #help-modal .modal-body:focus-visible {
+            outline: 3px solid #1f5f99;
+            outline-offset: -3px;
+        }
+        #help-modal .close-btn {
+            width: auto;
+        }
+        body.dark-mode #help-modal .modal-body h2 {
+            border-top-color: var(--border-color);
+        }
+
+        /* --- Password rule checklist on the sign-up form --- */
+        .password-rules-intro {
+            margin: 10px 0 4px;
+            font-size: 14px;
+            color: #495057;
+        }
+        .password-rules {
+            margin: 0 0 0 1.25em;
+            padding: 0;
+            font-size: 14px;
+            color: #495057;
+        }
+        .password-rules li {
+            margin-bottom: 2px;
+        }
+        .password-rules li.rule-met {
+            color: #1e7b34;
+        }
+        .password-rules .rule-status {
+            font-style: italic;
+        }
+        body.dark-mode .password-rules-intro,
+        body.dark-mode .password-rules {
+            color: var(--text-secondary);
+        }
+        body.dark-mode .password-rules li.rule-met {
+            color: var(--success-color);
+        }
+
+        /* --- Email verification banner --- */
+        .verify-banner {
+            background: #fff8e1;
+            border: 2px solid #b8860b;
+            border-left-width: 8px;
+            border-radius: 6px;
+            padding: 16px 20px;
+            margin: 0 0 24px;
+            color: #3d2f00;
+        }
+        .verify-banner h2 {
+            font-size: 1.15em;
+            margin: 0 0 6px;
+            color: #3d2f00;
+        }
+        .verify-banner p {
+            margin: 0 0 12px;
+        }
+        .verify-banner-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .verify-status:empty {
+            display: none;
+        }
+        .verify-status {
+            margin: 12px 0 0;
+            font-weight: 600;
+        }
+        body.dark-mode .verify-banner {
+            background: #3a2f0b;
+            border-color: var(--warning-color);
+            color: #fff3c4;
+        }
+        body.dark-mode .verify-banner h2 {
+            color: #fff3c4;
+        }
+        body.high-contrast .verify-banner {
+            background: #000;
+            border-color: #ffff00;
+            color: #fff;
+        }
+        body.high-contrast .verify-banner h2 {
+            color: #ffff00;
+        }
+
+        /* --- Visible status messages (card generation, etc.) --- */
+        .inline-status {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 6px;
+            border-left: 6px solid #1f5f99;
+            background: #eef5fb;
+            color: #1b2a38;
+        }
+        .inline-status:empty {
+            display: none;
+        }
+        .inline-status.is-error {
+            border-left-color: #b02a37;
+            background: #fbeaec;
+            color: #5c1018;
+        }
+        .inline-status.is-success {
+            border-left-color: #1e7b34;
+            background: #e8f5ec;
+            color: #12401d;
+        }
+        body.dark-mode .inline-status {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-left-color: var(--accent-color);
+        }
+        body.dark-mode .inline-status.is-error {
+            border-left-color: var(--danger-color);
+            background: var(--danger-bg);
+        }
+        body.dark-mode .inline-status.is-success {
+            border-left-color: var(--success-color);
+            background: var(--success-bg);
+        }
+        body.high-contrast .inline-status {
+            background: #000;
+            color: #fff;
+            border: 2px solid #ffff00;
+        }
+
+        /* --- Small explanatory text under a setting or button --- */
+        .setting-help,
+        .quiz-disabled-note {
+            font-size: 14px;
+            color: #5a6570;
+            margin: 0 0 8px;
+        }
+        .quiz-disabled-note {
+            margin: 8px 0 0;
+        }
+        body.dark-mode .setting-help,
+        body.dark-mode .quiz-disabled-note {
+            color: var(--text-muted);
+        }
+        body.high-contrast .setting-help,
+        body.high-contrast .quiz-disabled-note {
+            color: #fff;
+        }
+
+        /* --- Font size segmented selector --- */
+        .segmented {
+            display: inline-flex;
+            flex-wrap: wrap;
+            border: 2px solid #1f5f99;
+            border-radius: 6px;
+            overflow: hidden;
+            padding: 0;
+            margin: 0;
+        }
+        .segmented legend {
+            /* visually hidden; the setting label above names the group */
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+        }
+        .segmented label {
+            position: relative;
+            margin: 0;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .segmented input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+        }
+        .segmented span {
+            display: block;
+            padding: 8px 14px;
+            background: #ffffff;
+            color: #1f5f99;
+            border-right: 1px solid #c7dcef;
+        }
+        .segmented label:last-of-type span {
+            border-right: none;
+        }
+        .segmented input:checked + span {
+            background: #1f5f99;
+            color: #ffffff;
+        }
+        .segmented input:focus-visible + span {
+            outline: 3px solid #f0a500;
+            outline-offset: -3px;
+        }
+        body.dark-mode .segmented {
+            border-color: var(--accent-color);
+        }
+        body.dark-mode .segmented span {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-right-color: var(--border-color);
+        }
+        body.dark-mode .segmented input:checked + span {
+            background: #1f5f99;
+            color: #ffffff;
+        }
+        body.high-contrast .segmented {
+            border-color: #ffff00;
+        }
+        body.high-contrast .segmented span {
+            background: #000;
+            color: #fff;
+        }
+        body.high-contrast .segmented input:checked + span {
+            background: #ffff00;
+            color: #000;
+        }
+
+        /* Settings rows that stack a description under the label */
+        .setting-item.setting-item--stacked {
+            flex-wrap: wrap;
+            gap: 8px 16px;
+        }
+        .setting-item .setting-label-group {
+            flex: 1 1 260px;
+        }
+        .setting-item .setting-label-group label {
+            margin-bottom: 2px;
+        }
+
+        /* --- Stats: summary sits between the filters and the cards --- */
+        .stats-summary {
+            text-align: left;
+            margin: 0 0 20px;
+            color: #2c3e50;
+            font-size: 1.05em;
+        }
+        body.dark-mode .stats-summary {
+            color: var(--text-primary);
+        }
+
+        /* --- Media link on the back of a study card --- */
+        .card-media {
+            margin: 12px 0 0;
+            text-align: center;
+        }
+        .card-media a {
+            color: #1f5f99;
+            font-weight: 600;
+        }
+        .card-media .media-embed-wrapper {
+            margin-top: 12px;
+        }
+        .card-media iframe {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border: 0;
+            border-radius: 6px;
+        }
+        body.dark-mode .card-media a {
+            color: var(--accent-hover);
+        }
+        body.high-contrast .card-media a {
+            color: #ffff00;
+        }
+        .export-heading {
+            margin: 20px 0 6px;
+            font-size: 16px;
+        }
+        .export-help {
+            margin: 0 0 12px 1.25em;
+            padding: 0;
+        }
+        .export-help li {
+            margin-bottom: 4px;
+        }
+        .verify-banner .secondary-btn {
+            background: #ffffff;
+            color: #3d2f00;
+            border-color: #b8860b;
+        }
+        .verify-banner .secondary-btn:hover,
+        .verify-banner .secondary-btn:focus {
+            background: #fff3c4;
+            color: #3d2f00;
+            border-color: #8a6508;
+        }
+        body.dark-mode .verify-banner .secondary-btn {
+            background: transparent;
+            color: #fff3c4;
+            border-color: var(--warning-color);
+        }
+        body.dark-mode .verify-banner .secondary-btn:hover,
+        body.dark-mode .verify-banner .secondary-btn:focus {
+            background: #4a3d10;
+            color: #ffffff;
+        }
+        .cloud-sync-status {
+            margin: 0 0 24px;
+        }
+        .csv-format-help {
+            margin: 0 0 12px;
+        }
+        .csv-format-help summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: #1f5f99;
+            margin-bottom: 6px;
+        }
+        .csv-format-help ul {
+            margin: 6px 0 0 1.25em;
+            padding: 0;
+        }
+        .csv-format-help li {
+            margin-bottom: 4px;
+        }
+        body.dark-mode .csv-format-help summary {
+            color: var(--accent-hover);
+        }
+        body.high-contrast .csv-format-help summary {
+            color: #ffff00;
+        }
 </style>
 </head>
 <body>
@@ -1845,12 +2300,19 @@
             </div>
             <div class="form-group">
                 <label for="signup-password">Password</label>
-                <input type="password" id="signup-password" placeholder="At least 6 characters" autocomplete="new-password" required aria-describedby="password-requirements">
-                <span id="password-requirements" class="sr-only">Password must be at least 6 characters long.</span>
+                <input type="password" id="signup-password" autocomplete="new-password" required maxlength="64" aria-describedby="password-requirements-intro password-requirements">
+                <p id="password-requirements-intro" class="password-rules-intro">Your password needs:</p>
+                <ul id="password-requirements" class="password-rules">
+                    <li data-rule="length">8 to 64 characters <span class="rule-status">(not met yet)</span></li>
+                    <li data-rule="upper">At least one uppercase letter (A to Z) <span class="rule-status">(not met yet)</span></li>
+                    <li data-rule="lower">At least one lowercase letter (a to z) <span class="rule-status">(not met yet)</span></li>
+                    <li data-rule="number">At least one number (0 to 9) <span class="rule-status">(not met yet)</span></li>
+                    <li data-rule="special">At least one of these symbols: ! @ # $ % ^ &amp; * ( ) - _ = + [ ] { } ; : , . ? / ~ <span class="rule-status">(not met yet)</span></li>
+                </ul>
             </div>
             <div class="form-group">
                 <label for="signup-confirm-password">Confirm password</label>
-                <input type="password" id="signup-confirm-password" placeholder="Re-enter your password" autocomplete="new-password" required>
+                <input type="password" id="signup-confirm-password" placeholder="Re-enter your password" autocomplete="new-password" required maxlength="64">
             </div>
             <button type="submit" id="signup-submit-btn">Create Account</button>
         </form>
@@ -1888,6 +2350,19 @@
 
 
         <div aria-live="polite" aria-atomic="true" class="sr-only" id="announcements"></div>
+
+        <!-- Email verification banner (shown while the signed-in user's email is unverified) -->
+        <section id="verify-email-banner" class="verify-banner hidden" aria-labelledby="verify-email-heading">
+            <h2 id="verify-email-heading">Please verify your email address</h2>
+            <p><strong>Your account is device-only until you verify.</strong> Your decks are saved on this device only. They are not backed up, and they won't appear on your other devices. Signing out keeps them safe on this device. As soon as you verify, they are backed up automatically, and anything already saved in your account is kept.</p>
+            <p>To confirm your account, open the verification email sent to <strong id="verify-email-address"></strong> and select the link inside. You can keep using SparkDeck while you wait. The email comes from noreply@sparkdeck-8d613.firebaseapp.com, so if it doesn't show up within a few minutes, check your spam or junk folder, or select Resend verification email.</p>
+            <div class="verify-banner-actions">
+                <button type="button" id="verify-check-btn">I've verified my email</button>
+                <button type="button" id="verify-resend-btn" class="secondary-btn">Resend verification email</button>
+            </div>
+            <p id="verify-email-status" class="verify-status" role="status" aria-live="polite"></p>
+        </section>
+        <p id="cloud-sync-status" class="inline-status cloud-sync-status" role="status" aria-live="polite"></p>
 
         <nav class="nav-tabs" role="tablist">
             <button class="nav-tab active" role="tab" data-tab="decks" aria-selected="true">My Decks</button>
@@ -2023,6 +2498,7 @@ Photosynthesis is the process by which plants convert light energy into chemical
 Definition: Mitochondria
 Mitochondria are the powerhouses of the cell."></textarea>
                     <button id="generate-btn" type="button">Generate Cards from Notes</button>
+                    <p id="generate-status" class="inline-status" role="status" aria-live="polite"></p>
                 </div>
 
                 <div id="manual-input" class="section hidden">
@@ -2032,9 +2508,9 @@ Mitochondria are the powerhouses of the cell."></textarea>
                     <label for="card-back">Back of card (answer or definition):</label>
                     <textarea id="card-back" rows="4" placeholder="Example: Mitosis is the process of cell division."></textarea>
                     
-                    <label for="card-media">Optional media URL (YouTube link, Google Drive, etc.)</label>
+                    <label for="card-media">Optional video or resource link (YouTube, Google Drive, and so on)</label>
+                    <p id="card-media-help" class="setting-help">The link shows under the card when you flip it to the back during study. YouTube videos can be played right there; other links open in a new tab.</p>
                     <input type="url" id="card-media" placeholder="https://www.youtube.com/watch?v=..." aria-describedby="card-media-help">
-                    <div id="card-media-help" class="sr-only">Provide a link to a video or file. You can preview it after adding the card. Supported: YouTube (embedded). Other services will open in a viewer.</div>
                     
                     <div class="button-group">
                         <button id="add-card-btn" type="button">Add This Card</button>
@@ -2063,6 +2539,10 @@ Mitochondria are the powerhouses of the cell."></textarea>
                     <button type="button" class="stats-period-btn" data-period="daily" aria-pressed="false">Daily</button>
                 </div>
 
+                <div class="stats-summary" id="stats-summary" aria-live="polite">
+                    <p>Select a time period to view your study statistics.</p>
+                </div>
+
                 <div class="stats-container">
                     <div class="stats-card">
                         <div class="stats-card-value" id="stats-decks-count">0</div>
@@ -2078,9 +2558,6 @@ Mitochondria are the powerhouses of the cell."></textarea>
                     </div>
                 </div>
 
-                <div class="stats-summary" id="stats-summary" aria-live="polite">
-                    <p>Select a time period to view your study statistics.</p>
-                </div>
             </section>
 
             <!-- Settings Tab -->
@@ -2094,17 +2571,26 @@ Mitochondria are the powerhouses of the cell."></textarea>
                         <label for="dark-mode-btn">Dark Mode</label>
                         <button id="dark-mode-btn" type="button" aria-label="Toggle dark mode">Off</button>
                     </div>
-                    <div class="setting-item">
-                        <label for="font-size-btn">Font Size</label>
-                        <button id="font-size-btn" type="button" aria-label="Change font size">Medium</button>
+                    <div class="setting-item setting-item--stacked">
+                        <span class="setting-label" aria-hidden="true"><strong>Font Size</strong></span>
+                        <fieldset class="segmented" id="font-size-group">
+                            <legend>Font size</legend>
+                            <label><input type="radio" name="font-size" value="small"><span>Small</span></label>
+                            <label><input type="radio" name="font-size" value="medium" checked><span>Medium</span></label>
+                            <label><input type="radio" name="font-size" value="large"><span>Large</span></label>
+                            <label><input type="radio" name="font-size" value="extra-large"><span>Extra Large</span></label>
+                        </fieldset>
                     </div>
                     <div class="setting-item">
                         <label for="high-contrast-btn">High Contrast</label>
                         <button id="high-contrast-btn" type="button" aria-label="Toggle high contrast mode">Off</button>
                     </div>
-                    <div class="setting-item">
-                        <label for="reduced-motion-btn">Reduced Motion</label>
-                        <button id="reduced-motion-btn" type="button" aria-label="Toggle reduced motion">Off</button>
+                    <div class="setting-item setting-item--stacked">
+                        <div class="setting-label-group">
+                            <label for="reduced-motion-btn">Reduced Motion</label>
+                            <p id="reduced-motion-help" class="setting-help">Turns off animations, such as sliding, fading, and the moving progress bar, for people who find on-screen motion distracting or uncomfortable.</p>
+                        </div>
+                        <button id="reduced-motion-btn" type="button" aria-label="Toggle reduced motion" aria-describedby="reduced-motion-help">Off</button>
                     </div>
                 </div>
 
@@ -2131,10 +2617,32 @@ Mitochondria are the powerhouses of the cell."></textarea>
 
                 <div class="settings-section">
                     <h3>Data Management</h3>
-                    <p class="setting-description">Import and export your decks and folders for backup or sharing.</p>
+                    <p class="setting-description">Import decks from a file, or download a copy of all your decks and folders.</p>
+                    <p id="import-help" class="setting-help">Import Data accepts a SparkDeck backup file (.json) or a spreadsheet saved as CSV (.csv). Imported decks are added alongside your existing ones.</p>
+                    <details class="csv-format-help">
+                        <summary>How to set up a CSV spreadsheet for import</summary>
+                        <ul class="setting-help">
+                            <li>The first row names the columns. <strong>Front</strong> and <strong>Back</strong> are required. You can also use Question and Answer, or Term and Definition.</li>
+                            <li>Optional columns: <strong>Deck</strong> (cards with the same deck name go into one deck), <strong>Category</strong>, <strong>Folder</strong> (use a slash for folders inside folders, like Science / Biology), and <strong>Link</strong> (a video or web link).</li>
+                            <li>Each row after the first is one card. Rows without both a front and a back are skipped, and you're told which rows.</li>
+                            <li>If there is no Deck column, the cards go into a deck named after the file.</li>
+                            <li>A file downloaded with Download Spreadsheet (CSV) is already in this format, so you can edit it in Excel or Google Sheets and import it again. It comes back as new decks, and decks whose name is already used get "(imported)" added.</li>
+                        </ul>
+                    </details>
                     <div class="button-group">
-                        <button id="import-btn" type="button">Import Data</button>
-                        <button id="export-all-btn" type="button">Export All Data</button>
+                        <button id="import-btn" type="button" aria-describedby="import-help">Import Data</button>
+                    </div>
+                    <p id="import-status" class="inline-status" role="status" aria-live="polite"></p>
+                    <h4 class="export-heading">Export all data</h4>
+                    <ul class="setting-help export-help">
+                        <li><strong>Backup file:</strong> the best choice for keeping a copy or moving to another device. You can load it back with Import Data.</li>
+                        <li><strong>Spreadsheet (CSV):</strong> opens in Excel, Numbers, or Google Sheets, with one card per row.</li>
+                        <li><strong>Text file:</strong> a plain, readable list of every deck and card, handy for printing or reading.</li>
+                    </ul>
+                    <div class="button-group">
+                        <button id="export-all-btn" type="button">Download Backup File</button>
+                        <button id="export-csv-btn" type="button">Download Spreadsheet (CSV)</button>
+                        <button id="export-text-btn" type="button">Download Text File</button>
                     </div>
                 </div>
             </section>
@@ -2156,6 +2664,7 @@ Mitochondria are the powerhouses of the cell."></textarea>
             <div class="flashcard" id="flashcard" tabindex="0" role="button" aria-label="Flashcard - press Space or Enter to flip">
                 <div class="flashcard-content" id="card-content"></div>
             </div>
+            <div id="card-media-area" class="card-media hidden"></div>
 
             <div class="button-group study-controls">
                 <button id="prev-btn" type="button">Previous</button>
@@ -2215,93 +2724,124 @@ Mitochondria are the powerhouses of the cell."></textarea>
     </div>
 
     <!-- Help Modal (dialog) -->
-    <dialog id="help-modal" aria-labelledby="help-title" aria-describedby="help-description">
+    <dialog id="help-modal" aria-labelledby="help-title" aria-describedby="help-intro">
         <div class="modal-dialog">
             <div class="modal-header">
                 <h1 id="help-title" class="modal-title">Help</h1>
                 <button id="close-help-btn" type="button" class="close-btn" aria-label="Close help">Close</button>
             </div>
-            <div id="help-description" class="modal-body">
-                <p>Welcome to SparkDeck. This Help covers how to navigate the app, create decks, and study efficiently with keyboard shortcuts.</p>
+            <div id="help-body" class="modal-body" tabindex="0" role="region" aria-label="Help contents">
+                <p id="help-intro">SparkDeck helps you make flashcard decks and study them. This guide walks through each tab, then lists the keyboard shortcuts. Press Escape or the Close button to return to the app.</p>
 
-                <h2>Overview</h2>
-                <p>SparkDeck lets you create flashcard decks, generate cards from notes, and study them with accessible controls and progress tracking.</p>
+                <h2>The four tabs</h2>
+                <p>The row of tabs near the top of the page switches between the main areas of the app:</p>
+                <ul>
+                    <li><strong>My Decks:</strong> find, open, and organize your decks and folders.</li>
+                    <li><strong>Create Deck:</strong> build a new deck from your notes or one card at a time.</li>
+                    <li><strong>Stats:</strong> see how much you have studied. You can hide this tab in Settings.</li>
+                    <li><strong>Settings:</strong> change how the app looks and sounds, and back up your data.</li>
+                </ul>
+
+                <h2>My Decks</h2>
+                <h3>Finding a deck</h3>
+                <ul>
+                    <li><strong>Search:</strong> type part of a deck's name or category in the search box. The list updates as you type, and a line above the list tells you how many decks match.</li>
+                    <li><strong>Category:</strong> pick a category from the dropdown to show only decks in that category. You can combine it with a search.</li>
+                    <li><strong>Clear:</strong> appears once a filter is set. It removes the search text and category so every deck shows again.</li>
+                </ul>
+                <h3>Folders</h3>
+                <ul>
+                    <li><strong>Add Folder:</strong> creates a folder in the place you are currently viewing, so folders can sit inside other folders.</li>
+                    <li>Open a folder to see what is inside it. The path at the top shows where you are; choose any part of it to go back up.</li>
+                    <li>A folder's own menu lets you rename or delete it. Deleting a folder moves its decks back to the top level. They are not deleted.</li>
+                </ul>
+                <h3>Deck buttons</h3>
+                <ul>
+                    <li><strong>Study:</strong> flip through the cards at your own pace.</li>
+                    <li><strong>Quiz:</strong> test yourself. A deck needs at least 4 cards before you can quiz on it, because multiple choice questions use the other cards as wrong answers.</li>
+                </ul>
+                <h3>The deck actions menu</h3>
+                <p>Each deck has a button next to its name that screen readers announce as "Actions for" followed by the deck name. On screen it looks like three vertical dots. It opens a menu with these choices:</p>
+                <ul>
+                    <li><strong>Edit Cards:</strong> add, change, or remove cards in the deck.</li>
+                    <li><strong>Export:</strong> download just this deck as a backup file, a spreadsheet (CSV), or a plain text file.</li>
+                    <li><strong>Move to Folder:</strong> put the deck in a different folder.</li>
+                    <li><strong>Enable or Disable Shuffle:</strong> choose whether cards appear in random order or in the order you wrote them.</li>
+                    <li><strong>Delete:</strong> remove the deck. You will be asked to confirm first.</li>
+                </ul>
+
+                <h2>Create Deck</h2>
+                <ol>
+                    <li>Type a deck name, pick a category (or choose Custom to type your own), and choose a folder if you like.</li>
+                    <li>Choose how to add cards: <strong>Auto-Generate from Notes</strong> or <strong>Create Manually</strong>.</li>
+                    <li>Your cards appear in a preview list, where you can edit or remove any of them.</li>
+                    <li>Select <strong>Save Deck</strong>. If you try to leave with unsaved cards, SparkDeck asks before throwing them away.</li>
+                </ol>
+                <h3>Auto-generate from notes</h3>
+                <p>Paste your notes, then select Generate Cards from Notes. A message under the button tells you how many cards were made, or what went wrong. SparkDeck understands these layouts, one per line:</p>
+                <ul>
+                    <li>A question ending in a question mark, with the answer on the next line.</li>
+                    <li><strong>Term: definition</strong> on a single line (the definition needs at least 10 characters).</li>
+                    <li><strong>Term - definition</strong> on a single line, using a dash with spaces around it.</li>
+                    <li><strong>Definition: term</strong> on one line, with the explanation on the next line.</li>
+                </ul>
+                <h3>Create manually</h3>
+                <p>Type the front and back of the card. You can also paste a video link, such as a YouTube link. While studying, the link appears under the card when you flip to the back, and YouTube videos can be played right there.</p>
+
+                <h2>Studying</h2>
+                <ul>
+                    <li>Cards are shuffled unless you turned shuffle off for that deck.</li>
+                    <li>Use Flip to switch between the front and back, and Previous or Next to move between cards.</li>
+                    <li>Your place in the deck is shown and announced as you go.</li>
+                </ul>
+
+                <h2>Quiz</h2>
+                <ul>
+                    <li><strong>Multiple Choice:</strong> pick the right answer from 4 options.</li>
+                    <li><strong>Written:</strong> type your answer. Small differences in spelling and punctuation are accepted.</li>
+                    <li><strong>Mixed:</strong> a random mix of both.</li>
+                </ul>
+
+                <h2>Stats</h2>
+                <p>Choose Lifetime, Weekly, Monthly, or Daily. A sentence under the buttons sums up that period, followed by the number of decks created, study sessions, and cards studied.</p>
 
                 <h2>Settings</h2>
-                <p>Access Settings from the navigation tabs to:</p>
                 <ul>
-                    <li><strong>Sound Effects:</strong> Toggle sounds on/off</li>
-                    <li><strong>Import Data:</strong> Load decks from a SparkDeck JSON file</li>
-                    <li><strong>Export All:</strong> Backup all your decks and folders</li>
+                    <li><strong>Dark Mode:</strong> light text on a dark background.</li>
+                    <li><strong>Font Size:</strong> choose Small, Medium, Large, or Extra Large.</li>
+                    <li><strong>High Contrast:</strong> black, white, and yellow colors for maximum readability. This overrides dark mode.</li>
+                    <li><strong>Reduced Motion:</strong> turns off animations and sliding or fading effects, for people who find on-screen motion uncomfortable.</li>
+                    <li><strong>Sound Effects:</strong> turn the flip, quiz, and study sounds on or off.</li>
+                    <li><strong>Stats Tab:</strong> show or hide the Stats tab, or reset your stats.</li>
+                    <li><strong>Import Data:</strong> load decks from a SparkDeck backup file, or from a spreadsheet saved as CSV. A CSV needs a first row naming the columns: Front and Back are required, and Deck, Category, Folder, and Link are optional. Each row after that is one card. Settings has a short guide with more detail.</li>
+                    <li><strong>Export:</strong> download all your decks as a backup file (to import later), a spreadsheet file (CSV) that opens in Excel or Google Sheets, or a plain text file that is easy to read or print. Each deck's actions menu (the "Actions for" button next to the deck name) has the same three choices for just that deck.</li>
                 </ul>
 
-                <h2>Deck Actions</h2>
-                <p>Each deck has Study and Quiz buttons:</p>
-                <ul>
-                    <li><strong>Study:</strong> Flip through flashcards at your own pace (shuffled by default, or in order if shuffle is disabled)</li>
-                    <li><strong>Quiz:</strong> Test yourself with multiple choice, written answers, or mixed mode</li>
-                </ul>
-                <p>Click the ⋮ menu button for more options:</p>
-                <ul>
-                    <li><strong>Export:</strong> Download the deck as a JSON file</li>
-                    <li><strong>Move to Folder:</strong> Organize your deck</li>
-                    <li><strong>Delete:</strong> Remove the deck</li>
-                </ul>
+                <h2>Your account</h2>
+                <p>After you sign up, we email you a verification link. Until you open it, a reminder appears at the top of the app, and your account is device-only: your decks are saved on this device, but not backed up or shared with your other devices. You can keep studying in the meantime, resend the email, or select "I've verified my email" once you have clicked the link. Cloud backup then turns on, and the decks on this device are combined with anything already in your account, without deleting either.</p>
 
-                <h2>Quiz Mode</h2>
-                <p>Quiz mode tests your knowledge with instant feedback and scoring:</p>
-                <ul>
-                    <li><strong>Multiple Choice:</strong> Pick the correct answer from 4 options</li>
-                    <li><strong>Written:</strong> Type your answer (accepts similar answers)</li>
-                    <li><strong>Mixed:</strong> Random combination of both types</li>
-                </ul>
-                <p>You need at least 4 cards in a deck to start a quiz.</p>
-
-                <h2>Keyboard Shortcuts</h2>
+                <h2>Keyboard shortcuts</h2>
+                <p>These work anywhere in the app, as long as you are not typing in a text field.</p>
                 <h3>Navigation</h3>
                 <ul>
-                    <li><strong>D:</strong> Go to My Decks</li>
-                    <li><strong>C or N:</strong> Create new deck</li>
-                    <li><strong>F:</strong> Create new folder</li>
-                    <li><strong>S:</strong> Start studying first deck</li>
-                    <li><strong>1-9:</strong> Quick study deck by number</li>
-                    <li><strong>?:</strong> Open Help</li>
-                    <li><strong>Escape:</strong> Close dialogs, end study, or end quiz</li>
+                    <li><strong>D:</strong> go to My Decks</li>
+                    <li><strong>H:</strong> go to the top level of your folders</li>
+                    <li><strong>C or N:</strong> create a new deck</li>
+                    <li><strong>F:</strong> create a new folder</li>
+                    <li><strong>S:</strong> start studying the first deck</li>
+                    <li><strong>1 to 9:</strong> study the deck with that number</li>
+                    <li><strong>Question mark:</strong> open this Help</li>
+                    <li><strong>Escape:</strong> close dialogs, end study, or end a quiz</li>
                 </ul>
-
-                <h3>During Study</h3>
+                <h3>While studying</h3>
                 <ul>
-                    <li><strong>← / →:</strong> Previous / Next card</li>
-                    <li><strong>Space/Enter:</strong> Flip the current card</li>
+                    <li><strong>Left and Right arrows:</strong> previous and next card</li>
+                    <li><strong>Space or Enter:</strong> flip the current card</li>
                 </ul>
-
-                <h3>During Quiz</h3>
+                <h3>During a quiz</h3>
                 <ul>
-                    <li><strong>Enter:</strong> Submit written answer</li>
-                    <li><strong>Escape:</strong> End quiz early</li>
-                </ul>
-
-                <h3>General</h3>
-                <ul>
-                    <li><strong>Tab/Shift+Tab:</strong> Move between interactive elements</li>
-                    <li><strong>Space/Enter:</strong> Activate buttons</li>
-                </ul>
-
-                <h2>Creating Decks</h2>
-                <ol>
-                    <li>Go to “Create Deck”.</li>
-                    <li>Enter a deck name and pick a category.</li>
-                    <li>Choose to auto-generate from your notes or create cards manually.</li>
-                    <li>Preview and save when ready.</li>
-                </ol>
-
-                <h2>Studying Cards</h2>
-                <ul>
-                    <li>Select a deck from "My Decks", then choose "Study".</li>
-                    <li>Cards are shuffled by default. You can disable shuffle per deck to keep cards in order.</li>
-                    <li>Use Flip to switch between front and back.</li>
-                    <li>Use Previous/Next or arrow keys to move through cards.</li>
-                    <li>Progress updates are announced and shown visually.</li>
+                    <li><strong>Enter:</strong> submit a written answer</li>
+                    <li><strong>Escape:</strong> end the quiz early</li>
                 </ul>
             </div>
         </div>
