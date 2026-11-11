@@ -1978,7 +1978,7 @@ class SparkDeckApp {
                 <button type="button" class="deck-study-btn" data-deck-index="${deckIndex}" aria-label="Study deck ${safeName}">Study</button>
                 <button type="button" class="deck-quiz-btn" data-deck-index="${deckIndex}" aria-label="Quiz deck ${safeName}" ${quizBlocked ? `disabled aria-describedby="quiz-note-${deckIndex}"` : ''}>Quiz</button>
             </div>
-            ${quizBlocked ? `<p id="quiz-note-${deckIndex}" class="quiz-disabled-note">Quiz unlocks at 4 cards. This deck has ${deck.cards.length}, so add ${4 - deck.cards.length} more with Edit Cards in the ⋮ menu.</p>` : ''}
+            ${quizBlocked ? `<p id="quiz-note-${deckIndex}" class="quiz-disabled-note">Quiz unlocks at 4 cards. This deck has ${deck.cards.length}, so add ${4 - deck.cards.length} more. To add cards, open the "Actions for ${safeName}" button next to the deck name and choose Edit Cards.</p>` : ''}
         `;
 
         // Setup menu button
