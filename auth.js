@@ -32,6 +32,16 @@
     const authToggleSignup = document.getElementById('auth-toggle-signup');
     const authDivider = authScreen.querySelector('.auth-divider');
 
+    // Forgot password elements
+    const showResetBtn = document.getElementById('show-reset-btn');
+    const authToggleForgot = document.getElementById('auth-toggle-forgot');
+    const resetForm = document.getElementById('reset-form');
+    const resetEmail = document.getElementById('reset-email');
+    const resetSubmitBtn = document.getElementById('reset-submit-btn');
+    const resetStatus = document.getElementById('reset-status');
+    const resetBackBtn = document.getElementById('reset-back-btn');
+    const authToggleReset = document.getElementById('auth-toggle-reset');
+
     // Sign out button (in main app header)
     const signOutBtn = document.getElementById('sign-out-btn');
     const userEmailDisplay = document.getElementById('user-email-display');
@@ -401,25 +411,123 @@
     }
 
     // ---- Form Toggle ----
+    // The auth screen has three views: 'login', 'signup', and 'reset'
+    // (forgot password). Each view shows its own form and the links under it.
+
+    function showAuthView(view) {
+        loginForm.classList.toggle('hidden', view !== 'login');
+        authToggleForgot.classList.toggle('hidden', view !== 'login');
+        authToggleLogin.classList.toggle('hidden', view !== 'login');
+        signupForm.classList.toggle('hidden', view !== 'signup');
+        authToggleSignup.classList.toggle('hidden', view !== 'signup');
+        resetForm.classList.toggle('hidden', view !== 'reset');
+        authToggleReset.classList.toggle('hidden', view !== 'reset');
+        clearError();
+        setResetStatus('');
+    }
 
     showSignupBtn.addEventListener('click', function () {
-        loginForm.classList.add('hidden');
-        signupForm.classList.remove('hidden');
-        authToggleLogin.classList.add('hidden');
-        authToggleSignup.classList.remove('hidden');
-        clearError();
+        showAuthView('signup');
         signupEmail.focus();
         announce('Switched to sign up form');
     });
 
     showLoginBtn.addEventListener('click', function () {
-        signupForm.classList.add('hidden');
-        loginForm.classList.remove('hidden');
-        authToggleSignup.classList.add('hidden');
-        authToggleLogin.classList.remove('hidden');
-        clearError();
+        showAuthView('login');
         loginEmail.focus();
         announce('Switched to sign in form');
+    });
+
+    showResetBtn.addEventListener('click', function () {
+        // Carry over whatever they already typed in the sign-in email field.
+        var typed = loginEmail.value.trim();
+        if (typed) resetEmail.value = typed;
+        showAuthView('reset');
+        resetEmail.focus();
+        announce('Switched to reset password form');
+    });
+
+    resetBackBtn.addEventListener('click', function () {
+        var typed = resetEmail.value.trim();
+        if (typed && !loginEmail.value.trim()) loginEmail.value = typed;
+        showAuthView('login');
+        loginEmail.focus();
+        announce('Switched to sign in form');
+    });
+
+    // ---- Forgot Password ----
+    // Firebase emails a link to its own page where the person picks a new
+    // password. We show the same message whether or not an account exists
+    // for the address, so this form can't be used to find out who has an
+    // account.
+
+    function setResetStatus(message, type) {
+        if (!resetStatus) return;
+        resetStatus.classList.remove('is-error', 'is-success');
+        if (type) resetStatus.classList.add('is-' + type);
+        resetStatus.textContent = message || '';
+    }
+
+    function sendResetEmail(email) {
+        // After choosing a new password, Firebase's page offers a Continue
+        // button that comes back here. If this site's address isn't on the
+        // Firebase project's authorized domains list, send the plain email.
+        var settings = { url: window.location.origin + '/' };
+        return auth.sendPasswordResetEmail(email, settings).catch(function (error) {
+            if (error && (error.code === 'auth/unauthorized-continue-uri' ||
+                          error.code === 'auth/invalid-continue-uri' ||
+                          error.code === 'auth/missing-continue-uri')) {
+                return auth.sendPasswordResetEmail(email);
+            }
+            throw error;
+        });
+    }
+
+    resetForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        clearError();
+        setResetStatus('');
+
+        var email = resetEmail.value.trim();
+
+        if (!email) {
+            showError('Please enter your email address.');
+            resetEmail.focus();
+            return;
+        }
+
+        if (!isValidEmail(email)) {
+            showError('Please enter a complete email address, like name@example.com.');
+            resetEmail.focus();
+            return;
+        }
+
+        setLoading(resetSubmitBtn, true);
+
+        var sentMessage = 'If ' + email + ' belongs to a SparkDeck account, a password reset email is on its way. ' +
+            'Open it and select the link inside to choose a new password, then come back here and sign in. ' +
+            'The email comes from noreply@sparkdeck-8d613.firebaseapp.com. If it doesn\'t show up within a few minutes, ' +
+            'check your spam or junk folder. The link expires after one hour.';
+
+        sendResetEmail(email)
+            .then(function () {
+                setResetStatus(sentMessage, 'success');
+            })
+            .catch(function (error) {
+                var code = error && error.code;
+                if (code === 'auth/user-not-found') {
+                    // Same message as a real account, on purpose.
+                    setResetStatus(sentMessage, 'success');
+                } else if (code === 'auth/too-many-requests') {
+                    showError('Too many reset requests. Please wait a few minutes and try again.');
+                } else {
+                    console.warn('Password reset email failed:', error);
+                    showError(getFriendlyError(code));
+                }
+            })
+            .finally(function () {
+                setLoading(resetSubmitBtn, false);
+            });
     });
 
     // ---- Sign Up ----
@@ -733,12 +841,11 @@
             // Reset forms
             loginForm.reset();
             signupForm.reset();
+            resetForm.reset();
             updatePasswordChecklist('');
-            clearError();
 
             // Show login form by default
-            loginForm.classList.remove('hidden');
-            signupForm.classList.add('hidden');
+            showAuthView('login');
         }
     });
 })();

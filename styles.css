@@ -1923,6 +1923,15 @@ body.dark-mode .password-rules li.rule-met {
     color: var(--success-color);
 }
 
+/* --- Forgot password (auth screen) --- */
+.auth-toggle.auth-forgot {
+    margin-top: 12px;
+}
+.auth-form-heading {
+    font-size: 1.3em;
+    margin: 0 0 8px;
+}
+
 /* --- Email verification banner --- */
 .verify-banner {
     background: #fff8e1;

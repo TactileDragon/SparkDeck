@@ -1684,6 +1684,15 @@
             color: #2980b9;
         }
 
+        .auth-toggle.auth-forgot {
+            margin-top: 12px;
+        }
+
+        .auth-form-heading {
+            font-size: 1.3em;
+            margin: 0 0 8px;
+        }
+
         .auth-divider {
             text-align: center;
             margin: 20px 0;
@@ -2292,6 +2301,22 @@
             <button type="submit" id="login-submit-btn">Sign In</button>
         </form>
 
+        <div class="auth-toggle auth-forgot" id="auth-toggle-forgot">
+            <button type="button" id="show-reset-btn">Forgot your password?</button>
+        </div>
+
+        <!-- Password Reset Form (hidden by default) -->
+        <form id="reset-form" class="auth-form hidden" novalidate aria-labelledby="reset-heading">
+            <h2 id="reset-heading" class="auth-form-heading">Reset your password</h2>
+            <p id="reset-intro">Enter the email address you use for SparkDeck. If it belongs to an account, we'll send you a link to choose a new password.</p>
+            <div class="form-group">
+                <label for="reset-email">Email address</label>
+                <input type="email" id="reset-email" placeholder="you@example.com" autocomplete="email" required aria-describedby="reset-intro">
+            </div>
+            <button type="submit" id="reset-submit-btn">Send Reset Link</button>
+            <p id="reset-status" class="inline-status" role="status" aria-live="polite"></p>
+        </form>
+
         <!-- Signup Form (hidden by default) -->
         <form id="signup-form" class="auth-form hidden" novalidate>
             <div class="form-group">
@@ -2326,6 +2351,10 @@
         <div class="auth-toggle hidden" id="auth-toggle-signup">
             <span>Already have an account?</span>
             <button type="button" id="show-login-btn">Sign in</button>
+        </div>
+        <div class="auth-toggle hidden" id="auth-toggle-reset">
+            <span>Remembered it?</span>
+            <button type="button" id="reset-back-btn">Back to sign in</button>
         </div>
     </div>
 
