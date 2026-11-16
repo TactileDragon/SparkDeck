@@ -32,6 +32,33 @@
     const authToggleSignup = document.getElementById('auth-toggle-signup');
     const authDivider = authScreen.querySelector('.auth-divider');
 
+    // Forgot password elements
+    const showResetBtn = document.getElementById('show-reset-btn');
+    const authToggleForgot = document.getElementById('auth-toggle-forgot');
+    const resetForm = document.getElementById('reset-form');
+    const resetEmail = document.getElementById('reset-email');
+    const resetSubmitBtn = document.getElementById('reset-submit-btn');
+    const resetStatus = document.getElementById('reset-status');
+    const resetBackBtn = document.getElementById('reset-back-btn');
+    const authToggleReset = document.getElementById('auth-toggle-reset');
+
+    // Email link screen (reset password / verify email links land here)
+    const actionScreen = document.getElementById('action-screen');
+    const actionError = document.getElementById('action-error');
+    const actionLoading = document.getElementById('action-loading');
+    const newPasswordForm = document.getElementById('new-password-form');
+    const newPasswordHeading = document.getElementById('new-password-heading');
+    const newPasswordEmail = document.getElementById('new-password-email');
+    const newPassword = document.getElementById('new-password');
+    const newPasswordConfirm = document.getElementById('new-password-confirm');
+    const newPasswordSubmitBtn = document.getElementById('new-password-submit-btn');
+    const newPasswordRuleList = document.getElementById('new-password-requirements');
+    const actionResult = document.getElementById('action-result');
+    const actionResultHeading = document.getElementById('action-result-heading');
+    const actionResultMessage = document.getElementById('action-result-message');
+    const actionContinueBtn = document.getElementById('action-continue-btn');
+    const actionRetryBtn = document.getElementById('action-retry-btn');
+
     // Sign out button (in main app header)
     const signOutBtn = document.getElementById('sign-out-btn');
     const userEmailDisplay = document.getElementById('user-email-display');
@@ -87,10 +114,11 @@
 
     // Update the visible checklist under the password field. Each item gets a
     // text status (not just a color) so it reads correctly with a screen reader.
-    function updatePasswordChecklist(password) {
-        if (!passwordRuleList) return;
+    function updatePasswordChecklist(password, list) {
+        list = list || passwordRuleList;
+        if (!list) return;
         PASSWORD_RULES.forEach(function (rule) {
-            var item = passwordRuleList.querySelector('[data-rule="' + rule.id + '"]');
+            var item = list.querySelector('[data-rule="' + rule.id + '"]');
             if (!item) return;
             var met = rule.test(password);
             item.classList.toggle('rule-met', met);
@@ -98,6 +126,56 @@
             if (status) status.textContent = met ? '(done)' : '(not met yet)';
         });
     }
+
+    // "Your password still needs an uppercase letter and a number."
+    function describeUnmetRules(unmet) {
+        var missing = unmet.map(function (rule) { return rule.label; });
+        var list = missing.length === 1
+            ? missing[0]
+            : missing.slice(0, -1).join(', ') + ' and ' + missing[missing.length - 1];
+        return 'Your password still needs ' + list + '.';
+    }
+
+    // ---- Show / Hide Password Buttons ----
+    // Each button names the field(s) it controls in data-toggle-for. Its
+    // label says what pressing it will do: "Show password" while hidden,
+    // "Hide password" while shown. The change is also announced, because
+    // some screen readers don't re-read a focused button when its name changes.
+
+    var passwordToggles = [];
+
+    function setupPasswordToggle(button) {
+        var fields = button.getAttribute('data-toggle-for').split(' ').map(function (id) {
+            return document.getElementById(id);
+        }).filter(Boolean);
+        if (fields.length === 0) return;
+        var plural = fields.length > 1;
+        var showLabel = plural ? 'Show passwords' : 'Show password';
+        var hideLabel = plural ? 'Hide passwords' : 'Hide password';
+
+        function setShown(shown) {
+            fields.forEach(function (field) { field.type = shown ? 'text' : 'password'; });
+            button.textContent = shown ? hideLabel : showLabel;
+        }
+
+        button.addEventListener('click', function () {
+            var shown = fields[0].type === 'password';
+            setShown(shown);
+            announce(plural
+                ? (shown ? 'Passwords shown' : 'Passwords hidden')
+                : (shown ? 'Password shown' : 'Password hidden'));
+        });
+
+        passwordToggles.push(function () { setShown(false); });
+    }
+
+    // Put every password field back to hidden (when switching screens,
+    // after signing in, and so on), so a password is never left on show.
+    function hideAllPasswords() {
+        passwordToggles.forEach(function (hide) { hide(); });
+    }
+
+    document.querySelectorAll('.password-toggle').forEach(setupPasswordToggle);
 
     // ---- Helper Functions ----
 
@@ -401,25 +479,124 @@
     }
 
     // ---- Form Toggle ----
+    // The auth screen has three views: 'login', 'signup', and 'reset'
+    // (forgot password). Each view shows its own form and the links under it.
+
+    function showAuthView(view) {
+        loginForm.classList.toggle('hidden', view !== 'login');
+        authToggleForgot.classList.toggle('hidden', view !== 'login');
+        authToggleLogin.classList.toggle('hidden', view !== 'login');
+        signupForm.classList.toggle('hidden', view !== 'signup');
+        authToggleSignup.classList.toggle('hidden', view !== 'signup');
+        resetForm.classList.toggle('hidden', view !== 'reset');
+        authToggleReset.classList.toggle('hidden', view !== 'reset');
+        clearError();
+        setResetStatus('');
+        hideAllPasswords();
+    }
 
     showSignupBtn.addEventListener('click', function () {
-        loginForm.classList.add('hidden');
-        signupForm.classList.remove('hidden');
-        authToggleLogin.classList.add('hidden');
-        authToggleSignup.classList.remove('hidden');
-        clearError();
+        showAuthView('signup');
         signupEmail.focus();
         announce('Switched to sign up form');
     });
 
     showLoginBtn.addEventListener('click', function () {
-        signupForm.classList.add('hidden');
-        loginForm.classList.remove('hidden');
-        authToggleSignup.classList.add('hidden');
-        authToggleLogin.classList.remove('hidden');
-        clearError();
+        showAuthView('login');
         loginEmail.focus();
         announce('Switched to sign in form');
+    });
+
+    showResetBtn.addEventListener('click', function () {
+        // Carry over whatever they already typed in the sign-in email field.
+        var typed = loginEmail.value.trim();
+        if (typed) resetEmail.value = typed;
+        showAuthView('reset');
+        resetEmail.focus();
+        announce('Switched to reset password form');
+    });
+
+    resetBackBtn.addEventListener('click', function () {
+        var typed = resetEmail.value.trim();
+        if (typed && !loginEmail.value.trim()) loginEmail.value = typed;
+        showAuthView('login');
+        loginEmail.focus();
+        announce('Switched to sign in form');
+    });
+
+    // ---- Forgot Password ----
+    // Firebase emails a link to its own page where the person picks a new
+    // password. We show the same message whether or not an account exists
+    // for the address, so this form can't be used to find out who has an
+    // account.
+
+    function setResetStatus(message, type) {
+        if (!resetStatus) return;
+        resetStatus.classList.remove('is-error', 'is-success');
+        if (type) resetStatus.classList.add('is-' + type);
+        resetStatus.textContent = message || '';
+    }
+
+    function sendResetEmail(email) {
+        // After choosing a new password, Firebase's page offers a Continue
+        // button that comes back here. If this site's address isn't on the
+        // Firebase project's authorized domains list, send the plain email.
+        var settings = { url: window.location.origin + '/' };
+        return auth.sendPasswordResetEmail(email, settings).catch(function (error) {
+            if (error && (error.code === 'auth/unauthorized-continue-uri' ||
+                          error.code === 'auth/invalid-continue-uri' ||
+                          error.code === 'auth/missing-continue-uri')) {
+                return auth.sendPasswordResetEmail(email);
+            }
+            throw error;
+        });
+    }
+
+    resetForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        clearError();
+        setResetStatus('');
+
+        var email = resetEmail.value.trim();
+
+        if (!email) {
+            showError('Please enter your email address.');
+            resetEmail.focus();
+            return;
+        }
+
+        if (!isValidEmail(email)) {
+            showError('Please enter a complete email address, like name@example.com.');
+            resetEmail.focus();
+            return;
+        }
+
+        setLoading(resetSubmitBtn, true);
+
+        var sentMessage = 'If ' + email + ' belongs to a SparkDeck account, a password reset email is on its way. ' +
+            'Open it and select the link inside to choose a new password. ' +
+            'The email comes from noreply@sparkdeck-8d613.firebaseapp.com. If it doesn\'t show up within a few minutes, ' +
+            'check your spam or junk folder. The link expires after one hour.';
+
+        sendResetEmail(email)
+            .then(function () {
+                setResetStatus(sentMessage, 'success');
+            })
+            .catch(function (error) {
+                var code = error && error.code;
+                if (code === 'auth/user-not-found') {
+                    // Same message as a real account, on purpose.
+                    setResetStatus(sentMessage, 'success');
+                } else if (code === 'auth/too-many-requests') {
+                    showError('Too many reset requests. Please wait a few minutes and try again.');
+                } else {
+                    console.warn('Password reset email failed:', error);
+                    showError(getFriendlyError(code));
+                }
+            })
+            .finally(function () {
+                setLoading(resetSubmitBtn, false);
+            });
     });
 
     // ---- Sign Up ----
@@ -445,11 +622,7 @@
 
         var unmet = getUnmetPasswordRules(password);
         if (unmet.length > 0) {
-            var missing = unmet.map(function (rule) { return rule.label; });
-            var list = missing.length === 1
-                ? missing[0]
-                : missing.slice(0, -1).join(', ') + ' and ' + missing[missing.length - 1];
-            showError('Your password still needs ' + list + '.');
+            showError(describeUnmetRules(unmet));
             signupPassword.focus();
             return;
         }
@@ -654,7 +827,23 @@
     // Firebase calls this callback whenever the user's auth state changes
     // (sign in, sign out, page load with existing session).
 
+    // While the email link screen is open, the observer only records that
+    // Firebase is ready. The normal screen is shown when the person leaves
+    // the link screen (see leaveActionScreen).
+    var authReady = false;
+    var resolveAuthReady;
+    var authReadyPromise = new Promise(function (resolve) { resolveAuthReady = resolve; });
+    var justVerifiedEmail = false;
+
     auth.onAuthStateChanged(function (user) {
+        authReady = true;
+        resolveAuthReady();
+        if (actionActive) return;
+        handleAuthState(user);
+    });
+
+    function handleAuthState(user) {
+        hideAllPasswords();
         if (user) {
             // User is signed in - show the app, hide auth screen
             authScreen.classList.add('hidden');
@@ -684,7 +873,10 @@
 
             // Sync data with the database (async, doesn't block the UI).
             // If they verified somewhere else, this notices and turns sync on.
-            var wasUnverified = !user.emailVerified;
+            // justVerifiedEmail: they arrived from a verification link, and we
+            // already refreshed the account, so still show the "sync is on" message.
+            var wasUnverified = !user.emailVerified || justVerifiedEmail;
+            justVerifiedEmail = false;
             syncWithDatabase(user).then(function (result) {
                 if (!isStillSignedInAs(user.uid)) return;
                 updateVerifyBanner(auth.currentUser);
@@ -733,12 +925,257 @@
             // Reset forms
             loginForm.reset();
             signupForm.reset();
+            resetForm.reset();
             updatePasswordChecklist('');
-            clearError();
 
             // Show login form by default
-            loginForm.classList.remove('hidden');
-            signupForm.classList.add('hidden');
+            showAuthView('login');
         }
+    }
+
+    // ---- Email Link Screen ----
+    // Firebase's emails (reset password, verify email, undo an email change)
+    // link to this page with ?mode=...&oobCode=... once the Firebase console's
+    // "action URL" points here. We handle the link ourselves instead of on
+    // Firebase's page, so every control is labelled and the password rules
+    // match the sign-up form.
+
+    var actionParams = readActionParams();
+    var actionActive = !!actionParams;
+    var resetCode = null;
+    var resetAccountEmail = '';
+    var prefillEmail = '';
+
+    function readActionParams() {
+        try {
+            var params = new URLSearchParams(window.location.search);
+            var mode = params.get('mode');
+            var code = params.get('oobCode');
+            if (!mode || !code) return null;
+            // Take the one-time code out of the address bar and history right away.
+            history.replaceState(null, '', window.location.pathname + window.location.hash);
+            return { mode: mode, code: code };
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function showActionError(message) {
+        actionError.textContent = message;
+        actionError.classList.remove('hidden');
+        announce(message);
+    }
+
+    function clearActionError() {
+        actionError.textContent = '';
+        actionError.classList.add('hidden');
+    }
+
+    // Show the finished (or failed) result with one clear next step.
+    // options: { heading, message, retry: bool, retryLabel }
+    async function showActionResult(options) {
+        await authReadyPromise;
+        actionLoading.classList.add('hidden');
+        newPasswordForm.classList.add('hidden');
+        clearActionError();
+        actionResultHeading.textContent = options.heading;
+        actionResultMessage.textContent = options.message;
+        actionContinueBtn.textContent = auth.currentUser ? 'Continue to SparkDeck' : 'Sign in to SparkDeck';
+        actionRetryBtn.textContent = options.retryLabel || 'Send a New Reset Link';
+        actionRetryBtn.classList.toggle('hidden', !options.retry || !!auth.currentUser);
+        actionResult.classList.remove('hidden');
+        actionResultHeading.focus();
+    }
+
+    function leaveActionScreen(nextView) {
+        actionActive = false;
+        actionScreen.classList.add('hidden');
+        newPasswordForm.reset();
+        updatePasswordChecklist('', newPasswordRuleList);
+        if (!authReady) return; // the observer shows the right screen when Firebase is ready
+        handleAuthState(auth.currentUser);
+        if (!auth.currentUser) {
+            if (nextView === 'reset') {
+                showAuthView('reset');
+                if (prefillEmail) resetEmail.value = prefillEmail;
+                resetEmail.focus();
+            } else if (prefillEmail) {
+                loginEmail.value = prefillEmail;
+                loginPassword.focus();
+            }
+        }
+    }
+
+    // A friendly explanation for a link that can't be used.
+    function linkProblem(error, kind) {
+        var code = error && error.code;
+        if (code === 'auth/network-request-failed') {
+            return { heading: 'We could not check your link',
+                message: 'Network error. Please check your internet connection, then open the link from your email again.' };
+        }
+        if (code === 'auth/user-disabled') {
+            return { heading: 'This account is turned off',
+                message: 'The account this link is for has been disabled, so it cannot be used.' };
+        }
+        if (kind === 'reset') {
+            return { heading: 'This reset link no longer works',
+                message: 'Password reset links work once and expire after one hour. This one has expired or was already used. You can ask for a new one.',
+                retry: true };
+        }
+        if (kind === 'verify') {
+            return { heading: 'This verification link no longer works',
+                message: 'It has expired or was already used. If your email is not verified yet, sign in and select Resend verification email to get a new link.' };
+        }
+        return { heading: 'This link no longer works',
+            message: 'It has expired or was already used.' };
+    }
+
+    async function startActionFlow(params) {
+        authScreen.classList.add('hidden');
+        appContainer.classList.add('hidden');
+        actionScreen.classList.remove('hidden');
+        var heading = actionScreen.querySelector('h1');
+        heading.setAttribute('tabindex', '-1');
+        heading.focus();
+
+        if (params.mode === 'resetPassword') {
+            try {
+                resetAccountEmail = await auth.verifyPasswordResetCode(params.code);
+            } catch (error) {
+                return showActionResult(linkProblem(error, 'reset'));
+            }
+            resetCode = params.code;
+            prefillEmail = resetAccountEmail;
+            newPasswordEmail.textContent = resetAccountEmail;
+            actionLoading.classList.add('hidden');
+            newPasswordForm.classList.remove('hidden');
+            newPasswordHeading.focus();
+            return;
+        }
+
+        if (params.mode === 'verifyEmail') {
+            try {
+                await auth.applyActionCode(params.code);
+            } catch (error) {
+                await authReadyPromise;
+                var user = auth.currentUser;
+                if (user) { try { await user.reload(); } catch (_) {} }
+                if (auth.currentUser && auth.currentUser.emailVerified) {
+                    return showActionResult({ heading: 'Your email is already verified',
+                        message: 'There is nothing more to do. Cloud sync is on for your account.' });
+                }
+                return showActionResult(linkProblem(error, 'verify'));
+            }
+            await authReadyPromise;
+            if (auth.currentUser) {
+                try { await auth.currentUser.reload(); } catch (_) {}
+                justVerifiedEmail = true;
+            }
+            return showActionResult({ heading: 'Your email is verified',
+                message: auth.currentUser
+                    ? 'Thank you! SparkDeck will now back up your decks and keep them in sync on every device where you sign in.'
+                    : 'Thank you! When you sign in, SparkDeck will back up your decks and keep them in sync on every device where you sign in.' });
+        }
+
+        if (params.mode === 'recoverEmail') {
+            try {
+                var info = await auth.checkActionCode(params.code);
+                await auth.applyActionCode(params.code);
+                prefillEmail = (info && info.data && info.data.email) || '';
+            } catch (error) {
+                return showActionResult(linkProblem(error, 'recover'));
+            }
+            return showActionResult({ heading: 'Your sign-in email was changed back',
+                message: 'Your account uses ' + (prefillEmail || 'your previous email address') +
+                    ' again. If you did not ask for the email change, reset your password now to keep your account safe.',
+                retry: true, retryLabel: 'Reset My Password' });
+        }
+
+        if (params.mode === 'verifyAndChangeEmail') {
+            try {
+                await auth.applyActionCode(params.code);
+            } catch (error) {
+                return showActionResult(linkProblem(error, 'change'));
+            }
+            return showActionResult({ heading: 'Your new email is confirmed',
+                message: 'Use your new email address the next time you sign in.' });
+        }
+
+        return showActionResult({ heading: 'We do not recognize this link',
+            message: 'This link is not one SparkDeck knows how to open. Please check that you copied the whole link from the email.' });
+    }
+
+    newPassword.addEventListener('input', function () {
+        updatePasswordChecklist(newPassword.value, newPasswordRuleList);
     });
+
+    newPasswordForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        clearActionError();
+
+        var password = newPassword.value;
+        var confirm = newPasswordConfirm.value;
+
+        var unmet = getUnmetPasswordRules(password);
+        if (unmet.length > 0) {
+            showActionError(describeUnmetRules(unmet));
+            newPassword.focus();
+            return;
+        }
+        if (password !== confirm) {
+            showActionError('Passwords do not match.');
+            newPasswordConfirm.focus();
+            return;
+        }
+
+        setLoading(newPasswordSubmitBtn, true);
+        try {
+            await auth.confirmPasswordReset(resetCode, password);
+        } catch (error) {
+            setLoading(newPasswordSubmitBtn, false);
+            var code = error && error.code;
+            if (code === 'auth/expired-action-code' || code === 'auth/invalid-action-code') {
+                return showActionResult(linkProblem(error, 'reset'));
+            }
+            showActionError(getFriendlyError(code));
+            newPassword.focus();
+            return;
+        }
+
+        // Sign straight in with the new password, so it doesn't have to be
+        // typed again. Skipped if someone else is signed in on this device.
+        await authReadyPromise;
+        var current = auth.currentUser;
+        var signedIn = false;
+        if (!current || (current.email || '').toLowerCase() === resetAccountEmail.toLowerCase()) {
+            try {
+                if (window.app && window.app.flushCloudSync) {
+                    try { await window.app.flushCloudSync(); } catch (_) {}
+                }
+                await auth.signInWithEmailAndPassword(resetAccountEmail, password);
+                signedIn = true;
+            } catch (signInError) {
+                console.warn('Signing in after password reset failed:', signInError);
+            }
+        }
+        setLoading(newPasswordSubmitBtn, false);
+        hideAllPasswords();
+        newPasswordForm.reset();
+        updatePasswordChecklist('', newPasswordRuleList);
+
+        showActionResult({ heading: 'Your password is changed',
+            message: signedIn
+                ? 'Your new password is saved, and you are signed in as ' + resetAccountEmail + '.'
+                : 'Your new password is saved. Use it the next time you sign in as ' + resetAccountEmail + '.' });
+    });
+
+    actionContinueBtn.addEventListener('click', function () {
+        leaveActionScreen('login');
+    });
+
+    actionRetryBtn.addEventListener('click', function () {
+        leaveActionScreen('reset');
+    });
+
+    if (actionActive) startActionFlow(actionParams);
 })();

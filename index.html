@@ -1684,6 +1684,26 @@
             color: #2980b9;
         }
 
+        .auth-toggle.auth-forgot {
+            margin-top: 12px;
+        }
+
+        .auth-form-heading {
+            font-size: 1.3em;
+            margin: 0 0 8px;
+        }
+
+        .password-toggle {
+            margin-top: 8px;
+        }
+
+        .action-result-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
         .auth-divider {
             text-align: center;
             margin: 20px 0;
@@ -2288,8 +2308,25 @@
             <div class="form-group">
                 <label for="login-password">Password</label>
                 <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" required>
+                <button type="button" class="secondary-btn password-toggle" data-toggle-for="login-password">Show password</button>
             </div>
             <button type="submit" id="login-submit-btn">Sign In</button>
+        </form>
+
+        <div class="auth-toggle auth-forgot" id="auth-toggle-forgot">
+            <button type="button" id="show-reset-btn">Forgot your password?</button>
+        </div>
+
+        <!-- Password Reset Form (hidden by default) -->
+        <form id="reset-form" class="auth-form hidden" novalidate aria-labelledby="reset-heading">
+            <h2 id="reset-heading" class="auth-form-heading">Reset your password</h2>
+            <p id="reset-intro">Enter the email address you use for SparkDeck. If it belongs to an account, we'll send you a link to choose a new password.</p>
+            <div class="form-group">
+                <label for="reset-email">Email address</label>
+                <input type="email" id="reset-email" placeholder="you@example.com" autocomplete="email" required aria-describedby="reset-intro">
+            </div>
+            <button type="submit" id="reset-submit-btn">Send Reset Link</button>
+            <p id="reset-status" class="inline-status" role="status" aria-live="polite"></p>
         </form>
 
         <!-- Signup Form (hidden by default) -->
@@ -2313,6 +2350,7 @@
             <div class="form-group">
                 <label for="signup-confirm-password">Confirm password</label>
                 <input type="password" id="signup-confirm-password" placeholder="Re-enter your password" autocomplete="new-password" required maxlength="64">
+                <button type="button" class="secondary-btn password-toggle" data-toggle-for="signup-password signup-confirm-password">Show passwords</button>
             </div>
             <button type="submit" id="signup-submit-btn">Create Account</button>
         </form>
@@ -2327,6 +2365,56 @@
             <span>Already have an account?</span>
             <button type="button" id="show-login-btn">Sign in</button>
         </div>
+        <div class="auth-toggle hidden" id="auth-toggle-reset">
+            <span>Remembered it?</span>
+            <button type="button" id="reset-back-btn">Back to sign in</button>
+        </div>
+    </div>
+
+    <!-- Email Link Screen (shown when someone opens a link from a SparkDeck
+         email: reset password, verify email, or undo an email change) -->
+    <div id="action-screen" class="auth-container hidden">
+        <div class="auth-header">
+            <h1>SparkDeck</h1>
+        </div>
+
+        <div id="action-error" class="auth-error hidden" role="alert" aria-live="assertive"></div>
+
+        <p id="action-loading" class="action-loading" role="status">Checking your link...</p>
+
+        <!-- Choose a new password -->
+        <form id="new-password-form" class="auth-form hidden" novalidate aria-labelledby="new-password-heading">
+            <h2 id="new-password-heading" class="auth-form-heading" tabindex="-1">Choose a new password</h2>
+            <p>This new password is for the SparkDeck account <strong id="new-password-email"></strong>.</p>
+            <div class="form-group">
+                <label for="new-password">New password</label>
+                <input type="password" id="new-password" autocomplete="new-password" required maxlength="64" aria-describedby="new-password-requirements-intro new-password-requirements">
+                <p id="new-password-requirements-intro" class="password-rules-intro">Your password needs:</p>
+                <ul id="new-password-requirements" class="password-rules">
+                    <li data-rule="length">8 to 64 characters <span class="rule-status">(not met yet)</span></li>
+                    <li data-rule="upper">At least one uppercase letter (A to Z) <span class="rule-status">(not met yet)</span></li>
+                    <li data-rule="lower">At least one lowercase letter (a to z) <span class="rule-status">(not met yet)</span></li>
+                    <li data-rule="number">At least one number (0 to 9) <span class="rule-status">(not met yet)</span></li>
+                    <li data-rule="special">At least one of these symbols: ! @ # $ % ^ &amp; * ( ) - _ = + [ ] { } ; : , . ? / ~ <span class="rule-status">(not met yet)</span></li>
+                </ul>
+            </div>
+            <div class="form-group">
+                <label for="new-password-confirm">Confirm new password</label>
+                <input type="password" id="new-password-confirm" autocomplete="new-password" required maxlength="64">
+                <button type="button" class="secondary-btn password-toggle" data-toggle-for="new-password new-password-confirm">Show passwords</button>
+            </div>
+            <button type="submit" id="new-password-submit-btn">Save New Password</button>
+        </form>
+
+        <!-- Result of the link: done, or a problem -->
+        <section id="action-result" class="hidden" aria-labelledby="action-result-heading">
+            <h2 id="action-result-heading" class="auth-form-heading" tabindex="-1"></h2>
+            <p id="action-result-message"></p>
+            <div class="action-result-buttons">
+                <button type="button" id="action-continue-btn">Sign in to SparkDeck</button>
+                <button type="button" id="action-retry-btn" class="secondary-btn hidden">Send a New Reset Link</button>
+            </div>
+        </section>
     </div>
 
     <!-- Main App (hidden until signed in) -->
