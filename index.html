@@ -2289,6 +2289,10 @@
 </style>
 </head>
 <body>
+    <!-- Screen reader announcements. Kept outside every screen so it is never
+         inside a hidden section (hidden live regions are not spoken). -->
+    <div aria-live="polite" aria-atomic="true" class="sr-only" id="announcements"></div>
+
     <!-- Auth Screen (shown when not signed in) -->
     <div id="auth-screen" class="auth-container">
         <div class="auth-header">
@@ -2437,7 +2441,6 @@
         </header>
 
 
-        <div aria-live="polite" aria-atomic="true" class="sr-only" id="announcements"></div>
 
         <!-- Email verification banner (shown while the signed-in user's email is unverified) -->
         <section id="verify-email-banner" class="verify-banner hidden" aria-labelledby="verify-email-heading">

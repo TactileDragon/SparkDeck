@@ -179,11 +179,17 @@
 
     // ---- Helper Functions ----
 
+    var announceTimer = null;
     function announce(message) {
-        if (announcements) {
+        if (!announcements) return;
+        // Clear first, then set on the next tick, so the same message twice
+        // in a row is still spoken. Each new message restarts the clean-up timer.
+        clearTimeout(announceTimer);
+        announcements.textContent = '';
+        setTimeout(function () {
             announcements.textContent = message;
-            setTimeout(function () { announcements.textContent = ''; }, 3000);
-        }
+            announceTimer = setTimeout(function () { announcements.textContent = ''; }, 3000);
+        }, 50);
     }
 
     function showError(message) {
